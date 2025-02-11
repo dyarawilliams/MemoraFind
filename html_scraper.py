@@ -70,6 +70,23 @@ def extract_dates(dates_tag):
         death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
         return birth, death
 
+def extract_grave_location(location_tag):
+    if location_tag:
+        location_text = location_tag.find("strong").get_text().strip() if location_tag.find("strong") else ""
+        section_match = re.search(r"(?:Sec(?:tion)?\s+)?([A-Za-z]+)", location_text, re.IGNORECASE)
+        lot_match = re.search(r"(?:Lot\s+)?(\d+)", location_text, re.IGNORECASE)
+        section = section_match.group().split()[-1].upper() if section_match else ""
+        lot = int(lot_match.group() if lot_match else "")
+
+        return {
+            "SECTION": section,
+            "LOT": lot
+        }
+    return {
+        "SECTION": None,
+        "LOT": None
+    }
+
 # Open the file
 with open("bcmg.html", "r", encoding="utf-8") as HTML_file:
     soup = BeautifulSoup(HTML_file, "html.parser")
@@ -97,9 +114,17 @@ for memorial in memorials:
     grave_location = extract_grave_location(location_tag)
     veteran_status = "Y" if veteran_tag else ""
     
-    # data.append({
-
-    # })
+    data.append({
+        **name_details,
+        "VETERAN": veteran_status,
+        "BIRTH_DAY": birth["day"],
+        "BIRTH_MONTH": birth["month"],
+        "BIRTH_YEAR": birth["year"],
+        "DEATH_DAY": death["day"],
+        "DEATH_MONTH": death["month"],
+        "DEATH_YEAR": death["year"],
+        **grave_location
+    })
 
 # Write the data to a CSV file
 with open("parsed_names_bcmg_1.csv", "w", encoding="utf-16", newline="") as CSV_file:
