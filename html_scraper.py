@@ -15,7 +15,7 @@ def extract_name_details(name_url, name_tag):
 
     full_text = name_tag.get_text()
 
-    prefix_tag = name_tag.find("span", class_="prefix") if prefix_tag else ""
+    prefix_tag = name_tag.find("span", class_="prefix")
     prefix = prefix_tag.get_text() if prefix_tag else ""
 
     maiden_tag = name_tag.find("i")
@@ -43,7 +43,7 @@ def extract_name_details(name_url, name_tag):
 
 def parse_date(date_string):
     if date_string.lower() == "unknown":
-        {"day": None, "month": None, "year": 'null'}
+        return {"day": None, "month": None, "year": "null"}
     parts = date_string.split()
     
     # 3 Jan 1923 - 5 Feb 2020
@@ -51,7 +51,7 @@ def parse_date(date_string):
     # If missing a day month or year make provisions for those 
     day = parts[0] if len(parts) == 3 else None
     month = parts[-2] if len(parts) >= 2 else None
-    year = parts[-2] if len(parts) >= 1 else None
+    year = parts[-1] if len(parts) >= 1 else None
 
     return {
         "day": day,
@@ -65,7 +65,7 @@ def extract_dates(dates_tag):
     if dates_tag:
         dates_text = dates_tag.get_text().strip()
 
-        birth_date, death_date = map(str.strip, dates_text.split("-"))
+        birth_date, death_date = map(str.strip, dates_text.split("–"))
         birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
         death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
         return birth, death
@@ -135,3 +135,5 @@ with open("parsed_names_bcmg_1.csv", "w", encoding="utf-16", newline="") as CSV_
     
     writer.writeheader()
     writer.writerows(data)
+
+print("Data written to CSV file")
