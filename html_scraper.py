@@ -74,9 +74,14 @@ def extract_grave_location(location_tag):
     if location_tag:
         location_text = location_tag.find("strong").get_text().strip() if location_tag.find("strong") else ""
         section_match = re.search(r"(?:Sec(?:tion)?\s+)?([A-Za-z]+)", location_text, re.IGNORECASE)
-        lot_match = re.search(r"(?:Lot\s+)?(\d+)", location_text, re.IGNORECASE)
-        section = section_match.group().split()[-1].upper() if section_match else ""
-        lot = int(lot_match.group() if lot_match else "")
+        lot_match = re.search(r"(\d+)", location_text, re.IGNORECASE)
+        section = section_match.group().split()[-1].upper() if section_match else None
+        
+        # Process lot - convert to integer or None
+        try:
+            lot = int(lot_match.group(1)) if lot_match else None
+        except (ValueError, AttributeError):
+            lot = None
 
         return {
             "SECTION": section,
