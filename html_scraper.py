@@ -129,7 +129,7 @@ for memorial in memorials:
 # Write the data to a CSV file
 with open("parsed_names_bcmg_1.csv", "w", encoding="utf-16", newline="") as CSV_file:
     fieldnames = [
-        MEMORIAL_ID, PREFIX, FIRST_NAME, MIDDLE_NAME, MAIDEN_NAME, LAST_NAME, SUFFIX, VETERAN, BIRTH_DAY, BIRTH_MONTH, BIRTH_YEAR, DEATH_DAY, DEATH_MONTH, DEATH_YEAR, SECTION, LOT
+        "MEMORIAL_ID", "PREFIX", "FIRST_NAME", "MIDDLE_NAME", "MAIDEN_NAME", "LAST_NAME", "SUFFIX", "VETERAN", "BIRTH_DAY", "BIRTH_MONTH", "BIRTH_YEAR", "DEATH_DAY", "DEATH_MONTH", "DEATH_YEAR", "SECTION", "LOT"
     ]
     writer = csv.DictWriter(CSV_file, fieldnames=fieldnames)
     
