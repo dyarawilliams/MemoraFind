@@ -41,7 +41,34 @@ def extract_name_details(name_url, name_tag):
         "SUFFIX": suffix
     }
 
+def parse_date(date_string):
+    if date_string.lower() == "unknown":
+        {"day": None, "month": None, "year": 'null'}
+    parts = date_string.split()
+    
+    # 3 Jan 1923 - 5 Feb 2020
+    # [3, Jan, 1923]
+    # If missing a day month or year make provisions for those 
+    day = parts[0] if len(parts) == 3 else None
+    month = parts[-2] if len(parts) >= 2 else None
+    year = parts[-2] if len(parts) >= 1 else None
 
+    return {
+        "day": day,
+        "month": month,
+        "year": year
+    }
+
+
+def extract_dates(dates_tag):
+    birth_date, death_date = None, None
+    if dates_tag:
+        dates_text = dates_tag.get_text().strip()
+
+        birth_date, death_date = map(str.strip, dates_text.split("-"))
+        birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
+        death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
+        return birth, death
 
 # Open the file
 with open("bcmg.html", "r", encoding="utf-8") as HTML_file:
@@ -54,6 +81,7 @@ memorials = soup.find_all("div", attrs={"role": "group", "aria-label": "Memorial
 data = []
 
 for memorial in memorials:
+    #  Extract the fields from the memorial
     name_url = memorial.find("a").get("href")
     name_tag = memorial.find("i", class_="pe-2")
     veteran_tag = memorial.find("span", title="Veteran")
@@ -69,9 +97,9 @@ for memorial in memorials:
     grave_location = extract_grave_location(location_tag)
     veteran_status = "Y" if veteran_tag else ""
     
-    data.append({
+    # data.append({
 
-    })
+    # })
 
 # Write the data to a CSV file
 with open("parsed_names_bcmg_1.csv", "w", encoding="utf-16", newline="") as CSV_file:
