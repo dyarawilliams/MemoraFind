@@ -64,12 +64,12 @@ def extract_dates(dates_tag):
     birth_date, death_date = None, None
     if dates_tag:
         dates_text = dates_tag.get_text().strip()
-
         birth_date, death_date = map(str.strip, dates_text.split("–"))
-        birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
-        death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
-        return birth, death
-    return {"day": None, "month": None, "year": None}, {"day": None, "month": None, "year": None} # Return default values when dates_tag is None
+        
+    birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
+    death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
+    return birth, death
+    # return {"day": None, "month": None, "year": None}, {"day": None, "month": None, "year": None} # Return default values when dates_tag is None
 
 def extract_grave_location(location_tag):
     if location_tag:
