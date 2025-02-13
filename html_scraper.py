@@ -43,7 +43,7 @@ def extract_name_details(name_url, name_tag):
 
 def parse_date(date_string):
     if date_string.lower() == "unknown":
-        return {"day": None, "month": None, "year": "null"}
+        return {"day": None, "month": None, "year": None}
     parts = date_string.split()
     
     # 3 Jan 1923 - 5 Feb 2020
@@ -64,12 +64,12 @@ def extract_dates(dates_tag):
     birth_date, death_date = None, None
     if dates_tag:
         dates_text = dates_tag.get_text().strip()
-
         birth_date, death_date = map(str.strip, dates_text.split("–"))
-        birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
-        death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
-        return birth, death
-    return {"day": None, "month": None, "year": None}, {"day": None, "month": None, "year": None} # Return default values when dates_tag is None
+        
+    birth = parse_date(birth_date) if birth_date else {"day": None, "month": None, "year": None}
+    death = parse_date(death_date) if death_date else {"day": None, "month": None, "year": None}
+    return birth, death
+    # return {"day": None, "month": None, "year": None}, {"day": None, "month": None, "year": None} # Return default values when dates_tag is None
 
 def extract_grave_location(location_tag):
     if location_tag:
@@ -133,7 +133,7 @@ for memorial in memorials:
     })
 
 # Write the data to a CSV file
-with open("parsed_names_bcmg_1.csv", "w", encoding="utf-16", newline="") as CSV_file:
+with open("parsed_names_bcmg.csv", "w", encoding="utf-16", newline="") as CSV_file:
     fieldnames = [
         "MEMORIAL_ID", "PREFIX", "FIRST_NAME", "MIDDLE_NAME", "MAIDEN_NAME", "LAST_NAME", "SUFFIX", "VETERAN", "BIRTH_DAY", "BIRTH_MONTH", "BIRTH_YEAR", "DEATH_DAY", "DEATH_MONTH", "DEATH_YEAR", "SECTION", "LOT"
     ]
