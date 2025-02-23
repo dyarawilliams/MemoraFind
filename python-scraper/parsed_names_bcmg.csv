@@ -1,4 +1,4 @@
-MEMORIAL_ID,PREFIX,FIRST_NAME,MIDDLE_NAME,MAIDEN_NAME,LAST_NAME,SUFFIX,VETERAN,BIRTH_DAY,BIRTH_MONTH,BIRTH_YEAR,DEATH_DAY,DEATH_MONTH,DEATH_YEAR,SECTION,LOT
+memorial_id,prefix,first_name,middle_name,maiden_name,last_name,suffix,veteran,birth_day,birth_month,birth_year,death_day,death_month,death_year,section,lot
 205490038,,Louise,A,Orr,Abel,,,21,Feb,1922,10,May,2017,,
 92223593,PVT,Martin,Luther,,Abel,,,25,Jul,1917,21,May,2012,,
 193943236,,Nathaniel,,,Abel,,,1,Nov,1916,26,Mar,1997,,
