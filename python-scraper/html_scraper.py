@@ -32,13 +32,13 @@ def extract_name_details(name_url, name_tag):
         suffix = full_text.split()[-1]
     
     return {
-        "MEMORIAL_ID": memorial_id,
-        "PREFIX": prefix,
-        "FIRST_NAME": first_name,
-        "MIDDLE_NAME": middle_name,
-        "MAIDEN_NAME": maiden_name,
-        "LAST_NAME": last_name,
-        "SUFFIX": suffix
+        "memorial_id": memorial_id,
+        "prefix": prefix,
+        "first_name": first_name,
+        "middle_name": middle_name,
+        "maiden_name": maiden_name,
+        "last_name": last_name,
+        "suffix": suffix
     }
 
 def parse_date(date_string):
@@ -85,12 +85,12 @@ def extract_grave_location(location_tag):
             lot = None
 
         return {
-            "SECTION": section,
-            "LOT": lot
+            "section": section,
+            "lot": lot
         }
     return {
-        "SECTION": None,
-        "LOT": None
+        "section": None,
+        "lot": None
     }
 
 # Open the file
@@ -122,20 +122,20 @@ for memorial in memorials:
     
     data.append({
         **name_details,
-        "VETERAN": veteran_status,
-        "BIRTH_DAY": birth["day"],
-        "BIRTH_MONTH": birth["month"],
-        "BIRTH_YEAR": birth["year"],
-        "DEATH_DAY": death["day"],
-        "DEATH_MONTH": death["month"],
-        "DEATH_YEAR": death["year"],
+        "veteran": veteran_status,
+        "birth_day": birth["day"],
+        "birth_month": birth["month"],
+        "birth_year": birth["year"],
+        "death_day": death["day"],
+        "death_month": death["month"],
+        "death_year": death["year"],
         **grave_location
     })
 
 # Write the data to a CSV file
 with open("parsed_names_bcmg.csv", "w", encoding="utf-8", newline="") as CSV_file:
     fieldnames = [
-        "MEMORIAL_ID", "PREFIX", "FIRST_NAME", "MIDDLE_NAME", "MAIDEN_NAME", "LAST_NAME", "SUFFIX", "VETERAN", "BIRTH_DAY", "BIRTH_MONTH", "BIRTH_YEAR", "DEATH_DAY", "DEATH_MONTH", "DEATH_YEAR", "SECTION", "LOT"
+        "memorial_id", "prefix", "first_name", "middle_name", "maiden_name", "last_name", "suffix", "veteran", "birth_day", "birth_month", "birth_year", "death_day", "death_month", "death_year", "section", "lot"
     ]
     writer = csv.DictWriter(CSV_file, fieldnames=fieldnames)
     
