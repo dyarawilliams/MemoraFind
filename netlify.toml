@@ -1,0 +1,21 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/"
+  to = "/.netlify/functions/renderIndex"
+  status = 200
+
+[[redirects]]
+  from = "/search/:cemetery"
+  to = "/.netlify/functions/renderSearch?cemetery=:cemetery"
+  status = 200
+
+[[redirects]]
+  from = "/search"
+  to = "/.netlify/functions/search"
+  status = 200
+
+[functions]
+  included_files = ["public/views/**"]
