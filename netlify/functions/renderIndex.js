@@ -1,7 +1,7 @@
 const ejs = require('ejs');
 const path = require('path');
 
-exports.handler = async function (event, context) {
+exports.handler = async (event, context) => {
   try {
 
     //retrieve page and render it as HTML
