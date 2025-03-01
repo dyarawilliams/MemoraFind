@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Search</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="wrapper">
+        <header>
+            <h1><%= title %> - Search Records</h1>
+            <a href="/.netlify/functions/updatePage">Update a Record (requires login)</a>
+            <a href="/">Back to Home</a>
+        </header>
+        
+        <!-- <div class="search-container">
+            <form action="/.netlify/functions/search" method="GET" id="search-form">
+                <input type="hidden" name="cemetery" value="<%= cemetery %>">
+                <input type="text" name="query" placeholder="Search by name...">
+                <button type="submit">Search</button>
+            </form>
+        </div> -->
+
+        <div class="form-section">
+            <form action="/.netlify/functions/search" method="GET" id="search-form">
+                <h2><%= cemetery %> Search Records</h2>
+                <p>Enter as many values as known. Leave fields blank for all records.</p>
+                <div class="form-group">
+                    <label for="lastName">Last Name:</label>
+                    <input type="text" id="lastName" name="lastName" />
+                </div>
+                <div class="form-group">
+                    <label for="firstName">First Name:</label>
+                    <input type="text" id="firstName" name="firstName" />
+                </div>
+                <div class="form-group">
+                    <label for="maidenName">Maiden Name:</label>
+                    <input type="text" id="maidenName" name="maidenName" />
+                </div>
+                <div class="form-group">
+                    <label for="birthYear">Birth Year:</label>
+                    <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" />
+                </div>
+                <div>
+                    <label for="deathYear">Death Year:</label>
+                    <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" />
+                </div>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+        <div class="results-section"></div>
+            <h2>Search Results</h2>
+            <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
+            <% if(records) { %>
+                <table>
+                    <tr>
+                        <th>ID</th>
+                        <th>TITLE</th>
+                        <th>LAST NAME</th>
+                        <th>FIRST NAME</th>
+                        <th>MIDDLE</th>
+                        <th>MAIDEN</th>
+                        <th>BIRTH DATE</th>
+                        <th>DEATH DATE</th>
+                        <th>AGE</th>
+                        <th>SECTION</th>
+                        <th>LOT</th>
+                        <th>IS VET</th>
+                        <th>NOTES</th>
+                        <th>MOVED FROM</th>
+                        <th>MOVED TO</th>
+                    </tr>
+
+                    <% records.forEach(function(record) { %>
+                        <tr>
+                            <% for(let field in record) { %>
+                                <td>
+                                    <%= record[field] %>
+                                </td>
+                            <% } %>
+                        </tr>
+                    <% }); %>
+                </table>
+                <% } else {"No records returned."} %>
+        </div>
+        
+    </div>
+</body>
+</html>
