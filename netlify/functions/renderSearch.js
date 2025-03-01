@@ -3,16 +3,18 @@ const path = require("path");
 
 exports.handler = async function (event, context) {
     try {
-        // Extract cemetery parameter from query string
-        const { cemetery } = event.queryStringParameters;
-        console.log("Cemetery parameter:", cemetery); // Add logging
+        // Extract cemetery from path parameters
+        const cemetery = event.path.split('/').pop();
+        console.log("Path:", event.path);
+        console.log("Cemetery parameter:", cemetery);
 
         // Validate cemetery parameter
         const validCemeteries = ["bcmg", "capernaum", "honeyford"];
-        if (!validCemeteries.includes(cemetery)) {
+        if (!cemetery || !validCemeteries.includes(cemetery)) {
             return {
                 statusCode: 404,
                 body: "Cemetery not found",
+                headers: { "Content-Type": "text/plain" }
             };
         }
 

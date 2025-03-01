@@ -9,8 +9,11 @@
 
 [[redirects]]
   from = "/search/:cemetery"
-  to = "/.netlify/functions/renderSearch?cemetery=:cemetery"
+  to = "/.netlify/functions/renderSearch"
   status = 200
+  force = true
+  [redirects.query]
+    cemetery = ":cemetery"
 
 # [[redirects]]
 #   from = "/search"
