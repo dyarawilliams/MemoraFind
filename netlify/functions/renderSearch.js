@@ -3,7 +3,9 @@ const path = require("path");
 
 exports.handler = async function (event, context) {
     try {
+        // Extract cemetery parameter from query string
         const { cemetery } = event.queryStringParameters;
+        console.log("Cemetery parameter:", cemetery); // Add logging
 
         // Validate cemetery parameter
         const validCemeteries = ["bcmg", "capernaum", "honeyford"];
@@ -14,6 +16,7 @@ exports.handler = async function (event, context) {
             };
         }
 
+        // Render the search template
         const templatePath = path.resolve(
             __dirname,
             "../../public/views/search.ejs"
@@ -21,6 +24,7 @@ exports.handler = async function (event, context) {
         const html = await ejs.renderFile(templatePath, {
             cemetery,
             title: getCemeteryTitle(cemetery),
+            records: null // Add this to prevent undefined records error
         });
 
         return {
