@@ -3,20 +3,22 @@ const path = require("path");
 
 exports.handler = async function (event, context) {
     try {
-        // Extract cemetery from path parameters
-        const cemetery = event.path.split('/').pop();
-        console.log("Path:", event.path);
+        // Get cemetery parameter from query string
+        const { cemetery } = event.queryStringParameters;
         console.log("Cemetery parameter:", cemetery);
 
         // Validate cemetery parameter
         const validCemeteries = ["bcmg", "capernaum", "honeyford"];
-        if (!cemetery || !validCemeteries.includes(cemetery)) {
+        if (!validCemeteries.includes(cemetery)) {
             return {
                 statusCode: 404,
                 body: "Cemetery not found",
                 headers: { "Content-Type": "text/plain" }
             };
         }
+
+        // Get cemetery title
+        const title = getCemeteryTitle(cemetery);
 
         // Render the search template
         const templatePath = path.resolve(
@@ -25,7 +27,7 @@ exports.handler = async function (event, context) {
         );
         const html = await ejs.renderFile(templatePath, {
             cemetery,
-            title: getCemeteryTitle(cemetery),
+            title,
             records: null // Add this to prevent undefined records error
         });
 
@@ -35,7 +37,7 @@ exports.handler = async function (event, context) {
             body: html,
         };
     } catch (error) {
-        console.error("Error rendering search page:", error.message);
+        console.error("Error rendering search page:", error);
         return {
             statusCode: 500,
             body: "Internal Server Error",
@@ -49,5 +51,5 @@ function getCemeteryTitle(cemetery) {
         capernaum: "Capernaum Cemetery",
         honeyford: "Honey Ford Cemetery",
     };
-    return titles[cemetery];
+    return titles[cemetery] || "Unknown Cemetery";
 }
