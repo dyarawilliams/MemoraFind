@@ -13,18 +13,10 @@
             <a href="/.netlify/functions/updatePage">Update a Record (requires login)</a>
             <a href="/">Back to Home</a>
         </header>
-        
-        <!-- <div class="search-container">
-            <form action="/.netlify/functions/search" method="GET" id="search-form">
-                <input type="hidden" name="cemetery" value="<%= cemetery %>">
-                <input type="text" name="query" placeholder="Search by name...">
-                <button type="submit">Search</button>
-            </form>
-        </div> -->
 
         <div class="form-section">
             <form action="/.netlify/functions/search" method="GET" id="search-form">
-                <h2><%= cemetery %> Search Records</h2>
+                <h2>Search Records</h2>
                 <p>Enter as many values as known. Leave fields blank for all records.</p>
                 <div class="form-group">
                     <label for="lastName">Last Name:</label>
@@ -49,7 +41,7 @@
                 <button type="submit">Search</button>
             </form>
         </div>
-        <div class="results-section"></div>
+        <div class="results-section">
             <h2>Search Results</h2>
             <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
             <% if(records) { %>
@@ -82,7 +74,9 @@
                         </tr>
                     <% }); %>
                 </table>
-                <% } else {"No records returned."} %>
+            <% } else { %>
+                "No records returned."
+            <% } %>
         </div>
         
     </div>
