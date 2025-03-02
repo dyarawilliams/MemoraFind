@@ -14,29 +14,33 @@
             <a href="/">Back to Home</a>
         </header>
 
-        <div class="form-section">
-            <form action="/.netlify/functions/search" method="GET" id="search-form">
+        <div class="search-container">
+            <form action="/.netlify/functions/search" method="GET" id="search-form-2" class="search-form">
                 <h2>Search Records</h2>
                 <p>Enter as many values as known. Leave fields blank for all records.</p>
-                <div class="form-group">
-                    <label for="lastName">Last Name:</label>
-                    <input type="text" id="lastName" name="lastName" />
+                <div class="name-fields">
+                    <div class="form-group">
+                        <label for="lastName">Last Name:</label>
+                        <input type="text" id="lastName" name="lastName" placeholder="Deer" />
+                    </div>
+                    <div class="form-group">
+                        <label for="firstName">First Name:</label>
+                        <input type="text" id="firstName" name="firstName" placeholder="John" />
+                    </div>
+                    <div class="form-group">
+                        <label for="maidenName">Maiden Name:</label>
+                        <input type="text" id="maidenName" name="maidenName" placeholder="Doe" />
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="firstName">First Name:</label>
-                    <input type="text" id="firstName" name="firstName" />
-                </div>
-                <div class="form-group">
-                    <label for="maidenName">Maiden Name:</label>
-                    <input type="text" id="maidenName" name="maidenName" />
-                </div>
-                <div class="form-group">
-                    <label for="birthYear">Birth Year:</label>
-                    <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" />
-                </div>
-                <div>
-                    <label for="deathYear">Death Year:</label>
-                    <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" />
+                <div class="date-fields">
+                    <div class="form-group">
+                        <label for="birthYear">Birth Year:</label>
+                        <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" placeholder="1952"/>
+                    </div>
+                    <div>
+                        <label for="deathYear">Death Year:</label>
+                        <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" placeholder="2021" />
+                    </div>
                 </div>
                 <button type="submit">Search</button>
             </form>

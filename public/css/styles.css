@@ -34,7 +34,7 @@ h1, h2, h3 {
 }
 
 header {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: #65aeb5;
     padding: 1rem 2rem;
     display: flex;
     justify-content: space-between;
@@ -45,15 +45,81 @@ header {
 .search-container {
     padding: 2rem;
     text-align: center;
-    margin-bottom: 2rem;
+    position: relative;
 }
 
-.search-container select,
-.search-container input,
-.search-container button {
+.search-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.5);
+    z-index: 1;
+}
+
+.search-form {
+    background-color: #e26f44;
+}
+
+.search-form {
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 2;
+}
+
+.search-form select {
     padding: 0.5rem 1rem;
     margin: 0.5rem;
     font-size: 1rem;
+}
+
+.search-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+#search-form-1 label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.search-form input {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+
+#search-form-2 .name-fields, #search-form-2 .date-fields {
+    display: flex;
+    gap: 1rem;
+}
+
+#search-form-2 .date-fields {
+    justify-content: center;
+}
+
+.search-form button {
+    background-color: #4a4a4a;
+    color: white;
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.search-form button:hover {
+    background-color: #333;
 }
 
 .cemetery-grid {
@@ -66,7 +132,6 @@ header {
 }
 
 .cemetery-card {
-    background: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     overflow: hidden;
@@ -87,16 +152,18 @@ header {
     transform: translateY(-5px);
 }
 
-.cemetery-card img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-}
-
 .cemetery-card h2 {
     padding: 1rem;
     margin: 0;
     font-size: 1.5rem;
+    background-color: #65aeb5;
+    text-align: center;
+}
+
+.cemetery-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
 }
 
 .cemetery-card p {
@@ -106,82 +173,19 @@ header {
 
 .cemetery-link {
     display: block;
-    background: #4a4a4a;
-    color: white;
+    background: #65aeb5;
+    color: #333;
     text-decoration: none;
     text-align: center;
     padding: 1rem;
     margin-top: 1rem;
+    border-radius: 8px;
     transition: background-color 0.3s ease;
 }
 
 .cemetery-link:hover {
-    background: #333;
-}
-
-.form-section {
-    background-image: url("/assets/bcmg.jpg");
-    /* Add your background image */
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    padding: 3rem 0;
-    position: relative;
-}
-
-.form-section::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.5);
-    z-index: 1;
-}
-
-form {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 2rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    position: relative;
-    z-index: 2;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-}
-
-input {
-    width: 100%;
-    padding: 0.8rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-button {
-    background-color: #4a4a4a;
-    color: white;
-    padding: 1rem 2rem;
-    border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-button:hover {
-    background-color: #333;
+    background: #e26f44;
+    color: #fff;
 }
 
 .results-section {
@@ -211,8 +215,8 @@ td {
 }
 
 footer {
-    background-color: #4a4a4a;
-    color: white;
+    background-color: #e26f44;
+    color: #333;
     text-align: center;
     padding: 1rem;
     margin-top: auto;
