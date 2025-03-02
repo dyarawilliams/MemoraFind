@@ -4,7 +4,7 @@ const path = require('path');
 exports.handler = async (event, context) => {
   try {
 
-    //retrieve page and render it as HTML
+    // Retrieve page and render it as HTML
     const templatePath = path.resolve(__dirname, '../../public/views/index.ejs');
     const html = await ejs.renderFile(templatePath, { records: null });
 

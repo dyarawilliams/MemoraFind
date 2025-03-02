@@ -17,7 +17,7 @@
 
         <div class="search-container">
             <h2>Quick Search</h2>
-            <form action="/.netlify/functions/search" method="GET" id="search-form">
+            <form action="/.netlify/functions/renderSearch" method="GET" id="search-form">
                 <select name="cemetery" id="cemetery-select" required>
                     <option value="">Select Cemetery</option>
                     <option value="bcmg">Bamberg County Memory Gardens</option>
@@ -74,10 +74,9 @@
         document.getElementById('search-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const cemetery = document.getElementById('cemetery-select').value;
-            const searchTerm = this.searchTerm.value;
             
             if (cemetery) {
-                window.location.href = `/.netlify/functions/search?cemetery=${cemetery}&lastName=${searchTerm}`;
+                window.location.href = `/search/${cemetery}`;
             }
         });
     </script>
