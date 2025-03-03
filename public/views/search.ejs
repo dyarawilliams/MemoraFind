@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> - Search</title>
+    <title>Bamberg County Cemetery Search</title>
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -49,35 +49,37 @@
             <h2>Search Results</h2>
             <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
             <% if(records) { %>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>TITLE</th>
-                        <th>LAST NAME</th>
-                        <th>FIRST NAME</th>
-                        <th>MIDDLE</th>
-                        <th>MAIDEN</th>
-                        <th>BIRTH DATE</th>
-                        <th>DEATH DATE</th>
-                        <th>AGE</th>
-                        <th>SECTION</th>
-                        <th>LOT</th>
-                        <th>IS VET</th>
-                        <th>NOTES</th>
-                        <th>MOVED FROM</th>
-                        <th>MOVED TO</th>
-                    </tr>
-
-                    <% records.forEach(function(record) { %>
+                <div class="table-responsive">
+                    <table>
                         <tr>
-                            <% for(let field in record) { %>
-                                <td>
-                                    <%= record[field] %>
-                                </td>
-                            <% } %>
+                            <th>ID</th>
+                            <th>TITLE</th>
+                            <th>LAST NAME</th>
+                            <th>FIRST NAME</th>
+                            <th>MIDDLE</th>
+                            <th>MAIDEN</th>
+                            <th>BIRTH DATE</th>
+                            <th>DEATH DATE</th>
+                            <th>AGE</th>
+                            <th>SECTION</th>
+                            <th>LOT</th>
+                            <th>IS VET</th>
+                            <th>NOTES</th>
+                            <th>MOVED FROM</th>
+                            <th>MOVED TO</th>
                         </tr>
-                    <% }); %>
-                </table>
+
+                        <% records.forEach(function(record) { %>
+                            <tr>
+                                <% for(let field in record) { %>
+                                    <td>
+                                        <%= record[field] %>
+                                    </td>
+                                <% } %>
+                            </tr>
+                        <% }); %>
+                    </table>
+                </div>
             <% } else { %>
                 "No records returned."
             <% } %>

@@ -100,11 +100,8 @@ header {
 
 #search-form-2 .name-fields, #search-form-2 .date-fields {
     display: flex;
-    gap: 1rem;
-}
-
-#search-form-2 .date-fields {
     justify-content: center;
+    gap: 1rem;
 }
 
 .search-form button {
@@ -189,29 +186,93 @@ header {
 }
 
 .results-section {
-    padding: 2rem;
-    max-width: 1200px;
     margin: 0 auto;
+    padding: 2rem;
+}
+
+.results-section span {
+    display: block;
+    padding-bottom: 2rem;
+}
+
+/* Responsive Table Styles */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 0 1rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 table {
     width: 100%;
-    margin-top: 2rem;
-    background: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    min-width: 800px; /* Ensures table doesn't shrink too much */
+    /* border-collapse: collapse; */
+    margin: 0;
 }
 
-th {
-    background-color: #4a4a4a;
-    color: white;
-    font-weight: 500;
-    text-align: left;
-    padding: 1rem;
+/* Improve table cell spacing on smaller screens */
+@media screen and (max-width: 768px) {
+    th, td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Optional: Hide less important columns on mobile */
+    table th:nth-child(5), /* Middle name */
+    table td:nth-child(5),
+    table th:nth-child(10), /* Section */
+    table td:nth-child(10),
+    table th:nth-child(11), /* Lot */
+    table td:nth-child(11),
+    table th:nth-child(13), /* Notes */
+    table td:nth-child(13),
+    table th:nth-child(14), /* Moved from */
+    table td:nth-child(14),
+    table th:nth-child(15), /* Moved to */
+    table td:nth-child(15) {
+        display: none;
+    }
 }
 
-td {
-    padding: 1rem;
-    border-bottom: 1px solid #eee;
+/* Add visual indication for scrollable table */
+.table-responsive::after {
+    content: '→';
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    color: rgba(0,0,0,0.3);
+    pointer-events: none;
+    animation: fadeInOut 2s infinite;
+    display: none;
+}
+
+@media screen and (max-width: 1024px) {
+    .table-responsive::after {
+        display: block;
+    }
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Improve table row hover states */
+tr:hover {
+    background-color: rgba(101, 174, 181, 0.1);
+}
+
+tr:nth-child(1){
+    background-color: #e26f44;
+}
+
+/* Zebra striping for better readability */
+tr:nth-child(even) {
+    background-color: rgba(0,0,0,0.02);
 }
 
 footer {
