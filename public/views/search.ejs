@@ -9,13 +9,13 @@
 <body>
     <div class="wrapper">
         <header>
-            <h1><%= title %> - Search Records</h1>
+            <h1>Bamberg County (SC) Cemetery Search</h1>
             <a href="/.netlify/functions/updatePage">Update a Record (requires login)</a>
             <a href="/">Back to Home</a>
         </header>
 
         <div class="search-container">
-            <form action="/.netlify/functions/search" method="GET" id="search-form-2" class="search-form">
+            <form action="/search/<%= cemetery %>" method="GET" id="search-form-2" class="search-form">
                 <h2>Search Records</h2>
                 <p>Enter as many values as known. Leave fields blank for all records.</p>
                 <div class="name-fields">
@@ -48,7 +48,7 @@
         <div class="results-section">
             <h2>Search Results</h2>
             <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
-            <% if(records) { %>
+            <% if(records && records.length > 0) { %>
                 <div class="table-responsive">
                     <table>
                         <tr>

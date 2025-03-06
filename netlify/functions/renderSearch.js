@@ -45,7 +45,7 @@ exports.handler = async function (event, context) {
         // Extract cemetery from path
         const cemetery = event.path.split('/').pop();
         console.log("Cemetery parameter:", cemetery);
-
+            
         // Validate cemetery
         const validCemeteries = ["bcmg", "capernaum", "honeyford"];
         if (!validCemeteries.includes(cemetery)) {
@@ -55,7 +55,7 @@ exports.handler = async function (event, context) {
                 headers: { "Content-Type": "text/plain" }
             };
         }
-
+            
         // Get cemetery title
         const title = getCemeteryTitle(cemetery);
 
@@ -63,12 +63,15 @@ exports.handler = async function (event, context) {
         let { data, error } = await query;
         if (error) throw error;
 
+        const hasSearchParams = lastName || firstName || maidenName || birthYear || deathYear;
+
         // Render the search template
         const templatePath = path.resolve(__dirname,"../../public/views/search.ejs");
         const html = await ejs.renderFile(templatePath, {
             cemetery,
             title,
-            records: data 
+            records: data ,
+            submitted: hasSearchParams
         });
 
         return {
