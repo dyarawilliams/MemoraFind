@@ -94,7 +94,7 @@ def extract_grave_location(location_tag):
     }
 
 # Open the file
-with open("bcmg.html", "r", encoding="utf-8") as HTML_file:
+with open("capernaum.html", "r", encoding="utf-8") as HTML_file:
     soup = BeautifulSoup(HTML_file, "html.parser")
 
 # Find the parent tag for memorials
@@ -133,7 +133,7 @@ for memorial in memorials:
     })
 
 # Write the data to a CSV file
-with open("parsed_names_bcmg.csv", "w", encoding="utf-8", newline="") as CSV_file:
+with open("parsed_names_capernaum.csv", "w", encoding="utf-8", newline="") as CSV_file:
     fieldnames = [
         "memorial_id", "prefix", "first_name", "middle_name", "maiden_name", "last_name", "suffix", "veteran", "birth_day", "birth_month", "birth_year", "death_day", "death_month", "death_year", "section", "lot"
     ]
