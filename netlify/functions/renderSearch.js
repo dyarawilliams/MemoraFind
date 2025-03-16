@@ -8,7 +8,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
 exports.handler = async function (event, context) {
     // Extract cemetery from path
     const cemetery = event.path.split('/').pop();
-    console.log("Cemetery parameter:", cemetery);
+    // console.log("Cemetery parameter:", cemetery);
         
     // Validate cemetery
     const validCemeteries = ["bcmg", "capernaum", "honeyford"];
