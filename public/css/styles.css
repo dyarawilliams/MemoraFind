@@ -195,39 +195,7 @@ header {
     padding-bottom: 2rem;
 }
 
-/* Responsive Table Styles */
-.table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 0 1rem;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
 
-table {
-    width: 100%;
-    min-width: 800px; /* Ensures table doesn't shrink too much */
-    /* border-collapse: collapse; */
-    margin: 0;
-}
-/* Optional: Hide less important columns on mobile */
-.table-responsive table th:nth-child(11), /* Section */
-.table-responsive table td:nth-child(11),
-.table-responsive table th:nth-child(12), /* Lot */
-.table-responsive table td:nth-child(12),
-.table-responsive table th:nth-child(14), /* Notes */
-.table-responsive table td:nth-child(14),
-.table-responsive table th:nth-child(15), /* Moved from */
-.table-responsive table td:nth-child(15),
-.table-responsive table th:nth-child(16), /* Moved to */
-.table-responsive table td:nth-child(16) {
-    display: none !important;
-}
-
-th, td {
-    padding: 0.5rem;
-    font-size: 1rem;
-}
 
 /* Improve table cell spacing on smaller screens */
 @media screen and (max-width: 768px) {

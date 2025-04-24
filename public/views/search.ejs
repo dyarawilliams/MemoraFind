@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bamberg County Cemetery Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
     <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -51,37 +52,33 @@
             <% if (!hasSearchParams) { %>
                 <p>Enter search criteria above to find records.</p>
             <% } else if (records && records.length > 0) { %>
+                <p>Found <%= records.length %> record(s) matching your search criteria.</p>
                 <div class="table-responsive">
-                    <table>
-                        <tr>
-                            <th>ID</th>
-                            <th>TITLE</th>
-                            <th>LAST NAME</th>
-                            <th>FIRST NAME</th>
-                            <th>MIDDLE NAME</th>
-                            <th>MAIDEN</th>
-                            <th>SUFFIX</th>
-                            <th>BIRTH DATE</th>
-                            <th>DEATH DATE</th>
-                            <th>AGE</th>
-                            <th>SECTION</th>
-                            <th>LOT</th>
-                            <th>IS VET</th>
-                            <th>NOTES</th>
-                            <th>MOVED FROM</th>
-                            <th>MOVED TO</th>
-                        </tr>
+                    
+                    <% records.forEach(function(record) { %>
+                        <div class="card mb-3">
+                            <header class="card-header">
+                                <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
+                            </header>
+                            <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <p class="card-title">Prefix: <%= (record.prefix) ? record.prefix : "N/A" %></p>
+                                        <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
+                                        <p class="card-text">Age: <%= record.age_sane %></p>
+                                    </div>
+                                    <div class="d-flex justify-content-evenly">
+                                        <p class="card-text">Birth Date: <%= record.birth_date %></p>
+                                        <p class="card-text">Death Date: <%= record.death_date %></p>
+                                    </div>
+                                    <div class="d-flex justify-content-evenly">
+                                        <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
+                                        <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
+                                    </div>
+                                    <p class="card-text text-center">Veteran: <%= (record.isVet === "Y") ? "Yes" : "No" %></p>
 
-                        <% records.forEach(function(record) { %>
-                            <tr>
-                                <% for(let field in record) { %>
-                                    <td>
-                                        <%= record[field] %>
-                                    </td>
-                                <% } %>
-                            </tr>
-                        <% }); %>
-                    </table>
+                            </div>
+                        </div>
+                    <% }); %>
                 </div>
             <% } else { %>
                 No records found matching your search criteria.
@@ -89,5 +86,7 @@
         </div>
         
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
 </body>
 </html>
