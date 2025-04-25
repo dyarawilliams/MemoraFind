@@ -74,8 +74,14 @@
                                         <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
                                         <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
                                     </div>
-                                    <p class="card-text text-center">Veteran: <%= (record.isVet === "Y") ? "Yes" : "No" %></p>
-
+                                    <div class="text-center">
+                                        <% console.log(record.is_vet) %>
+                                        <% if (record.is_vet == "Y") { %>
+                                            <img src="https://img.shields.io/badge/veteran-blue?style=for-the-badge" alt="veteran" />
+                                        <% } else { %>
+                                            <p class="card-text text-center">Veteran: No</p>
+                                        <% } %>
+                                    </div>
                             </div>
                         </div>
                     <% }); %>
