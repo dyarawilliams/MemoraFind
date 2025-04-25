@@ -196,16 +196,7 @@ header {
 }
 
 
-
-/* Improve table cell spacing on smaller screens */
-@media screen and (max-width: 768px) {
-    th, td {
-        padding: 0.5rem;
-        font-size: 0.9rem;
-    }
-}
-
-/* Add visual indication for scrollable table */
+/* Add visual indication for scrollable table
 .table-responsive::after {
     content: '→';
     position: absolute;
@@ -223,26 +214,12 @@ header {
     .table-responsive::after {
         display: block;
     }
-}
+} */
 
 @keyframes fadeInOut {
     0% { opacity: 0; }
     50% { opacity: 1; }
     100% { opacity: 0; }
-}
-
-/* Improve table row hover states */
-tr:hover {
-    background-color: rgba(101, 174, 181, 0.1);
-}
-
-tr:nth-child(1){
-    background-color: #e26f44;
-}
-
-/* Zebra striping for better readability */
-tr:nth-child(even) {
-    background-color: rgba(0,0,0,0.02);
 }
 
 footer {

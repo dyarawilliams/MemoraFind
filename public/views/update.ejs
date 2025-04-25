@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Record</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="container-fluid">
+    <div class="pt-4 d-flex">
+        <form action="/" method="get" class="me-2">
+            <button type="submit" class="btn btn-primary">Return Home</button>
+        </form>
+        
+        <form action="/.netlify/functions/logout" method="get">
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </form>
+    </div>
+
+    <h1 class="pt-4">Update a Grave Record</h1>
+    <p>Enter the Memorial ID of a specific record to see its information.</p>
+    <p>Make changes as needed, then click "Update This Record" to save the changes to the database. Please verify the changes are accurate prior to saving.</p>
+    <form action="/.netlify/functions/getUpdateRecord" method="get">
+        <label for="memorial_id">Interment ID to Update:</label>
+        <input type="number" id="memorial_id" name="memorial_id" required />
+        <button type="submit">Search</button>
+    </form>
+    <h1>Search Results</h1>
+    <% if(record) { %>
+        <pre><%= JSON.stringify(record, null, 2) %></pre>
+        <p>Make changes as needed, then click "Update This Record" to save the changes to the database. Please verify the changes are accurate prior to saving.</p>
+        <form action="/.netlify/functions/updateRecord" method="POST">
+            <label for="memorial_id">Memorial ID:</label>
+            <input type="number" name="memorial_id" value="<%= record.memorial_id %>" readonly />
+            <div class="form-group">
+                <label for="first_name">First Name:</label>
+                <input type="text" id="first_name" name="first_name" value="<%= record.first_name %>" required />
+            </div>
+            <div class="form-group">
+                <label for="middle_name">Middle Name:</label>
+                <input type="text" id="middle_name" name="middle_name" value="<%= record.middle_name %>" />
+            </div>
+            <div class="form-group">
+                <label for="maiden_name">Maiden Name:</label>
+                <input type="text" id="maiden_name" name="maiden_name" value="<%= record.maiden_name %>" />
+            </div>
+            <div class="form-group">
+                <label for="last_name">Last Name:</label>
+                <input type="text" id="last_name" name="last_name" value="<%= record.last_name %>" required />
+            </div>
+            <div class="form-group">
+                <label for="suffix">Suffix:</label>
+                <input type="text" id="suffix" name="suffix" value="<%= record.suffix %>" />
+            </div>
+            <div class="d-flex">
+                <p>Is a Vet: </p>
+                <% if (record.is_vet == "Y") { %>
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="is_vet1" name="is_vet" value="Y" checked />
+                        <label for="is_vet1" class="form-check-label">Yes</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="is_vet2" name="is_vet" value="N" />
+                        <label for="is_vet2" class="form-check-label">No</label>
+                    </div>
+                <% } else { %>
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="is_vet3" name="is_vet" value="Y" />
+                        <label for="is_vet3" class="form-check-label">Yes</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="radio" class="form-check-input" id="is_vet4" name="is_vet" value="N" checked/>
+                        <label for="is_vet4" class="form-check-label">No</label>
+                    </div>
+                <% } %>
+            </div>
+            <div class="form-group">
+                <label for="birth_year">Birth Year:</label>
+                <input type="number" id="birth_year" name="birth_year" value="<%= record.birth_year %>" min="1700" max="2050" required />
+            </div>
+            <div class="form-group">
+                <label for="birth_month">Birth Month:</label>
+                <input type="text" id="birth_month" name="birth_month" value="<%= record.birth_month %>" required />
+            </div>
+            <div class="form-group">
+                <label for="birth_day">Birth Day:</label>
+                <input type="number" id="birth_day" name="birth_day" value="<%= record.birth_day %>" min="1" max="31" required />
+            </div>
+            <div class="form-group">
+                <label for="death_year">Death Year:</label>
+                <input type="number" id="death_year" name="death_year" value="<%= record.death_year %>" min="1700" max="2050" />    
+            </div>
+            <div class="form-group">
+                <label for="death_month">Death Month:</label>
+                <input type="text" id="death_month" name="death_month" value="<%= record.death_month %>" />
+            </div>
+            <div class="form-group">
+                <label for="death_day">Death Day:</label>
+                <input type="number" id="death_day" name="death_day" value="<%= record.death_day %>" min="1" max="31" />
+            </div>
+            <div class="form-group">
+                <label for="section">Section:</label>
+                <input type="text" id="section" name="section" value="<%= record.section %>" />
+            </div>
+            <div class="form-group">
+                <label for="lot">Lot:</label>
+                <input type="text" id="lot" name="lot" value="<%= record.lot %>" />
+            </div>
+            <button type="submit">Update This Record</button>
+        </form>
+    <% } else if (message) { %>
+        <p><%= message %></p>
+    
+    <% } else {  %>
+        <p>Enter a valid Memorial ID to search.</p>
+    <% } %> 
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+</body>
+</html>

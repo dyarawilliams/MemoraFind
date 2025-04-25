@@ -21,16 +21,16 @@
                 <p>Enter as many values as known. Leave fields blank for all records.</p>
                 <div class="name-fields">
                     <div class="form-group">
-                        <label for="lastName">Last Name:</label>
-                        <input type="text" id="lastName" name="lastName" placeholder="Deer" />
-                    </div>
-                    <div class="form-group">
                         <label for="firstName">First Name:</label>
                         <input type="text" id="firstName" name="firstName" placeholder="John" />
                     </div>
                     <div class="form-group">
                         <label for="maidenName">Maiden Name:</label>
                         <input type="text" id="maidenName" name="maidenName" placeholder="Doe" />
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name:</label>
+                        <input type="text" id="lastName" name="lastName" placeholder="Deer" />
                     </div>
                 </div>
                 <div class="date-fields">
@@ -54,10 +54,9 @@
             <% } else if (records && records.length > 0) { %>
                 <p>Found <%= records.length %> record(s) matching your search criteria.</p>
                 <div class="table-responsive">
-                    
                     <% records.forEach(function(record) { %>
                         <div class="card mb-3">
-                            <header class="card-header">
+                            <header class="card-header text-center">
                                 <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
                             </header>
                             <div class="card-body">
@@ -74,8 +73,13 @@
                                         <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
                                         <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
                                     </div>
-                                    <p class="card-text text-center">Veteran: <%= (record.isVet === "Y") ? "Yes" : "No" %></p>
-
+                                    <div class="text-center">
+                                        <% if (record.is_vet == "Y") { %>
+                                            <img src="https://img.shields.io/badge/veteran-blue?style=for-the-badge" alt="veteran" />
+                                        <% } else { %>
+                                            <p class="card-text text-center">Veteran: No</p>
+                                        <% } %>
+                                    </div>
                             </div>
                         </div>
                     <% }); %>
