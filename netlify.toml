@@ -13,5 +13,10 @@
   status = 200
   force = true
 
+[[redirects]]
+  from = "/search/update"
+  to = "/.netlify/functions/getUpdateRecord"
+  status = 200
+
 [functions]
   included_files = ["public/views/**"]
