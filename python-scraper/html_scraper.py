@@ -122,7 +122,7 @@ for memorial in memorials:
     
     data.append({
         **name_details,
-        "veteran": veteran_status,
+        "is_vet": veteran_status,
         "birth_day": birth["day"],
         "birth_month": birth["month"],
         "birth_year": birth["year"],
@@ -135,7 +135,7 @@ for memorial in memorials:
 # Write the data to a CSV file
 with open("parsed_names_honeyford.csv", "w", encoding="utf-8", newline="") as CSV_file:
     fieldnames = [
-        "memorial_id", "prefix", "first_name", "middle_name", "maiden_name", "last_name", "suffix", "veteran", "birth_day", "birth_month", "birth_year", "death_day", "death_month", "death_year", "section", "lot"
+        "memorial_id", "prefix", "first_name", "middle_name", "maiden_name", "last_name", "suffix", "is_vet", "birth_day", "birth_month", "birth_year", "death_day", "death_month", "death_year", "section", "lot"
     ]
     writer = csv.DictWriter(CSV_file, fieldnames=fieldnames)
     
