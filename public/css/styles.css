@@ -1,4 +1,11 @@
 /* Base responsive setup */
+:root {
+    --bs-primary: #65aeb5 !important;;
+    --bs-secondary: #e26f44 !important;
+    --bs-primary-rgb: rgb(101, 174, 181) !important;
+    --bs-secondary-rgb: rgb(226, 111, 68);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -18,7 +25,7 @@ html {
 }
 
 body {
-    font-family: "Helvetica Neue", Arial, sans-serif;
+    /* font-family: "Helvetica Neue", Arial, sans-serif; */
     font-size: 1.2rem;
     line-height: 1.6;
     color: #333;
@@ -36,9 +43,6 @@ h1, h2, h3 {
 header {
     background-color: #65aeb5;
     padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -194,27 +198,6 @@ header {
     display: block;
     padding-bottom: 2rem;
 }
-
-
-/* Add visual indication for scrollable table
-.table-responsive::after {
-    content: '→';
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1rem;
-    color: rgba(0,0,0,0.3);
-    pointer-events: none;
-    animation: fadeInOut 2s infinite;
-    display: none;
-}
-
-@media screen and (max-width: 1024px) {
-    .table-responsive::after {
-        display: block;
-    }
-} */
 
 @keyframes fadeInOut {
     0% { opacity: 0; }

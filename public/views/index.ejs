@@ -1,23 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bamberg County Cemetery Plot Search</title>
-    <link rel="stylesheet" href="/css/styles.css">
-</head>
+<%- include('partials/header.ejs') %>
 
 <body>
+
     <div class="wrapper">
-        <header>
-            <h1>Bamberg County (SC) Cemetery Search</h1>
-            <a href="/.netlify/functions/updatePage">Update a Record (requires login)</a>
+        <header class="d-flex justify-content-between">
+            <h1>MemoraFind</h1>
+            <div class="d-flex">
+                <a href="/.netlify/functions/updatePage" class="btn btn">Update a Record (requires login)</a>
+                <a href="/" class="btn">Return Home</a>
+            </div>
         </header>
 
         <div class="search-container">
             <form action="/search" method="GET" id="search-form-1" class="search-form">
-                <h2>Quick Search</h2>
+                <h2>Bamberg County (SC) Cemetery Quick Search</h2>
                 <select name="cemetery" id="cemetery-select" required>
                     <option value="">Select Cemetery</option>
                     <option value="bcmg">Bamberg County Memory Gardens</option>
@@ -80,6 +76,4 @@
             }
         });
     </script>
-</body>
-
-</html>
+<%- include('partials/footer.ejs') %>
