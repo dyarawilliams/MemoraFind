@@ -32,26 +32,26 @@ async function updateRecordInSupabase(supabase, formData) {
       throw new Error('Invalid table name');
     }
 
-    // Check if the memorial_id exists in the tableName
-    const { data: existingRecord, error: checkError } = await supabase
+   // Fetch the current record from the database to compare against submitted data
+    const { data: currentData, error: fetchError } = await supabase
       .from(tableName)
       .select('*')
       .eq('memorial_id', memorial_id)
       .single();
     
     // If there is an error checking the record, throw an error
-    if (checkError) {
-      throw checkError;
+    if (fetchError) {
+      throw fetchError;
     }
     
     // If the record does not exist, throw an error
-    if (!existingRecord) {
+    if (!currentData) {
       throw new Error(`Memorial ID ${memorial_id} not found in cemetery ${cemetery}.`);
     }
 
     // Construct the update payload with only changed fields by comparing against old record
     const updatePayload = {};
-    const currentData = existingRecord;
+
     // Loop through formData and compare with currentData
     for (const key in formData) {
       // Skip the memorial_id field
@@ -59,21 +59,19 @@ async function updateRecordInSupabase(supabase, formData) {
         continue;
       }
 
-      if (formData[key] === '' || formData[key] === undefined || formData[key] === null) {
+      // Check if the field exists in formData and is not empty
+      currentData[key] === null ? currentData[key] = "" : currentData[key];
+
+      // Check if the field is not empty in formData
+      if (formData[key] === '' || formData[key] === null) {
+        // If the field is empty in formData, set it to null in updatePayload
         updatePayload[key] = null;
-      } else {
-        updatePayload[key] = formData[key];
       }
 
       // Check if the field exists in currentData and if it has changed
-      if (currentData[key] !== formData[key] && key !== 'memorial_id') {
+      if (formData[key] != currentData[key] && key !== 'memorial_id') {
         // Add to update payload
         updatePayload[key] = formData[key];
-      }
-
-      // If the field is a number and is NaN, set it to null in the update payload
-      if (typeof formData[key] === 'number' && isNaN(formData[key])) {
-        updatePayload[key] = null;
       }
     }
 
@@ -84,7 +82,6 @@ async function updateRecordInSupabase(supabase, formData) {
     }
 
     // Perform the update with the constructed payload
-
     const { data, error: updateError } = await supabase
       .from(tableName)
       .update(updatePayload)
@@ -133,10 +130,10 @@ exports.handler = async function (event, context) {
 
   try {
     memorial_id = formData.memorial_id;
-    //Try to update the database (see function definition)
+    // Try to update the database (see function definition)
     await updateRecordInSupabase(supabase, formData);
 
-    //If it worked, show the record ID to the user
+    // If it worked, show the memorial ID to the user
     const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
     const html = await ejs.renderFile(templatePath, { record: null, message: `Record ${memorial_id} has been updated successfully.` });
 
@@ -147,7 +144,7 @@ exports.handler = async function (event, context) {
     };
   } catch (error) {
 
-    //If it didn't work, show a friendly error message to the user.
+    // If it didn't work, show a error message to the user.
     console.error('Error updating record:', error);
     const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
     const html = await ejs.renderFile(templatePath, { record: null, message: 'Error Updating Record. Please try again.' });

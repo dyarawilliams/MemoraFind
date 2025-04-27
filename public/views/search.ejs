@@ -1,89 +1,92 @@
 <%- include('partials/header.ejs') %>
 
 <body>
-    <div class="wrapper">
-        <header class="d-flex justify-content-between">
-            <h1>MemoraFind</h1>
-            <div class="d-flex align-items-center">
-                <a href="/" class="btn btn-secondary mx-2">Home</a>
-                <a href="/.netlify/functions/updatePage" class="btn btn-success">Update a Record (requires login)</a>
-            </div>
-        </header>
+    <header class="d-flex justify-content-between">
+        <h1>MemoraFind</h1>
+        <div class="d-flex align-items-center">
+            <a href="/" class="btn btn-secondary mx-2">Home</a>
+            <a href="/.netlify/functions/updatePage" class="btn btn-success">Update a Record (requires login)</a>
+        </div>
+    </header>
 
-        <div class="search-container">
-            <form action="/search/<%= cemetery %>" method="GET" id="search-form-2" class="search-form">
-                <h2>Search Records</h2>
-                <p>Enter as many values as known. Leave fields blank for all records.</p>
-                <div class="name-fields">
-                    <div class="form-group">
-                        <label for="firstName">First Name:</label>
-                        <input type="text" id="firstName" name="firstName" placeholder="John" />
-                    </div>
-                    <div class="form-group">
-                        <label for="maidenName">Maiden Name:</label>
-                        <input type="text" id="maidenName" name="maidenName" placeholder="Doe" />
-                    </div>
-                    <div class="form-group">
-                        <label for="lastName">Last Name:</label>
-                        <input type="text" id="lastName" name="lastName" placeholder="Deer" />
-                    </div>
+    <div class="search-container">
+        <form action="/search/<%= cemetery %>" method="GET" id="search-form-2" class="search-form">
+            <h2>Search Records</h2>
+            <p>Enter as many values as known. Leave fields blank for all records.</p>
+            <div class="name-fields">
+                <div class="form-group">
+                    <label for="firstName">First Name:</label>
+                    <input type="text" id="firstName" name="firstName" placeholder="John" />
                 </div>
-                <div class="date-fields">
-                    <div class="form-group">
-                        <label for="birthYear">Birth Year:</label>
-                        <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" placeholder="1952"/>
-                    </div>
-                    <div>
-                        <label for="deathYear">Death Year:</label>
-                        <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" placeholder="2021" />
-                    </div>
+                <div class="form-group">
+                    <label for="maidenName">Maiden Name:</label>
+                    <input type="text" id="maidenName" name="maidenName" placeholder="Doe" />
                 </div>
-                <button type="submit">Search</button>
-            </form>
-        </div>
-        <div class="results-section">
-            <h2>Search Results</h2>
-            <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
-            <% if (!hasSearchParams) { %>
-                <p>Enter search criteria above to find records.</p>
-            <% } else if (records && records.length > 0) { %>
-                <p>Found <%= records.length %> record(s) matching your search criteria.</p>
-                <div class="table-responsive">
-                    <% records.forEach(function(record) { %>
-                        <div class="card mb-3">
-                            <header class="card-header text-center">
-                                <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
-                            </header>
-                            <div class="card-body">
-                                    <div class="d-flex justify-content-between">
-                                        <p class="card-title">Prefix: <%= (record.prefix) ? record.prefix : "N/A" %></p>
-                                        <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
-                                        <p class="card-text">Age: <%= record.age_sane %></p>
-                                    </div>
-                                    <div class="d-flex justify-content-evenly">
-                                        <p class="card-text">Birth Date: <%= record.birth_date %></p>
-                                        <p class="card-text">Death Date: <%= record.death_date %></p>
-                                    </div>
-                                    <div class="d-flex justify-content-evenly">
-                                        <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
-                                        <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
-                                    </div>
-                                    <div class="text-center">
-                                        <% if (record.is_vet == "Y") { %>
-                                            <img src="https://img.shields.io/badge/veteran-blue?style=for-the-badge" alt="veteran" />
-                                        <% } else { %>
-                                            <p class="card-text text-center">Veteran: No</p>
-                                        <% } %>
-                                    </div>
-                            </div>
-                        </div>
-                    <% }); %>
+                <div class="form-group">
+                    <label for="lastName">Last Name:</label>
+                    <input type="text" id="lastName" name="lastName" placeholder="Deer" />
                 </div>
-            <% } else { %>
-                No records found matching your search criteria.
-            <% } %>
-        </div>
-        
+            </div>
+            <div class="date-fields">
+                <div class="form-group">
+                    <label for="birthYear">Birth Year:</label>
+                    <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" placeholder="1952"/>
+                </div>
+                <div>
+                    <label for="deathYear">Death Year:</label>
+                    <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" placeholder="2021" />
+                </div>
+            </div>
+            <button type="submit">Search</button>
+        </form>
     </div>
+    <div class="results-section">
+        <h2>Search Results</h2>
+        <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
+        <% if (!hasSearchParams) { %>
+            <p>Enter search criteria above to find records.</p>
+        <% } else if (records && records.length > 0) { %>
+            <p>Found <%= records.length %> record(s) matching your search criteria.</p>
+            <div class="table-responsive">
+                <% records.forEach(function(record) { %>
+                    <div class="card mb-3">
+                        <header class="card-header text-center">
+                            <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
+                        </header>
+                        <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <p class="card-title">Prefix: <%= (record.prefix) ? record.prefix : "N/A" %></p>
+                                    <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
+                                    <p class="card-text">Age: <%= record.age_sane %></p>
+                                </div>
+                                <div class="d-flex justify-content-evenly">
+                                    <p class="card-text">Birth Date: <%= record.birth_date %></p>
+                                    <p class="card-text">Death Date: <%= record.death_date %></p>
+                                </div>
+                                <div class="d-flex justify-content-evenly">
+                                    <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
+                                    <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
+                                </div>
+                                <div class="text-center">
+                                    <% if (record.is_vet == "Y") { %>
+                                        <img src="https://img.shields.io/badge/veteran-blue?style=for-the-badge" alt="veteran" />
+                                    <% } else { %>
+                                        <p class="card-text text-center">Veteran: No</p>
+                                    <% } %>
+                                </div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            No records found matching your search criteria.
+        <% } %>
+    </div>
+    <footer>
+        <p>
+            &copy; 2025 MemoraFind. All rights reserved. Created by <a href="https://dyarawilliams.github.io" target="_blank">D'yara Williams</a>
+        </p>
+    </footer>
+
 
 <%- include('partials/footer.ejs') %>
