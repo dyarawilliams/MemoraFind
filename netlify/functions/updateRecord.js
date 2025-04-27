@@ -39,9 +39,12 @@ async function updateRecordInSupabase(supabase, formData) {
       .eq('memorial_id', memorial_id)
       .single();
     
-      if (checkError) {
+    // If there is an error checking the record, throw an error
+    if (checkError) {
       throw checkError;
     }
+    
+    // If the record does not exist, throw an error
     if (!existingRecord) {
       throw new Error(`Memorial ID ${memorial_id} not found in cemetery ${cemetery}.`);
     }
@@ -91,6 +94,7 @@ async function updateRecordInSupabase(supabase, formData) {
       console.error('Error updating record:', updateError);
       throw new Error('Failed to update the record. Please try again.');
     }
+
     return data;
   } catch (error) {
     console.error('Error updating record in Supabase:', error);
