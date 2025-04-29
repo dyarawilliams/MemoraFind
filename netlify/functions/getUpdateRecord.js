@@ -78,7 +78,8 @@ exports.handler = async function (event, context) {
       // If the record is found, render the update form with the record data
       const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
       const templateData = { record: record[0], message: null };
-      console.log(templateData)
+      // console.log(templateData)
+      
       const html = await ejs.renderFile(templatePath, templateData);
 
       return {

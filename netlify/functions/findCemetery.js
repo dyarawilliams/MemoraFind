@@ -12,13 +12,20 @@ async function findCemetery(memorial_id) {
     "capernaum_data_formatted_2",
     "honeyford_data_formatted_2",
   ];
+
   for (const cemeteryView of cemeteryViews) {
     const { data, error } = await supabase
       .from(cemeteryView)
       .select("memorial_id")
       .eq("memorial_id", memorial_id);
+    
     if (data && data.length > 0) {
       return cemeteryView;
+    }
+
+    if (error) {
+      console.error(`Error fetching from ${cemeteryView}:`, error);
+      throw new Error('An error occurred while querying the database.');
     }
   }
   return null;

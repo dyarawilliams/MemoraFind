@@ -59,23 +59,21 @@ async function updateRecordInSupabase(supabase, formData) {
         continue;
       }
 
-      // Check if the field exists in formData and is not empty
-      currentData[key] === null ? currentData[key] = "" : currentData[key];
+      // Normalize null values in currentData
+      currentData[key] = currentData[key] === null ? "" : currentData[key];
 
-      // Check if the field is not empty in formData
-      if (formData[key] === '' || formData[key] === null) {
-        // If the field is empty in formData, set it to null in updatePayload
-        updatePayload[key] = null;
-      }
-
-      // Check if the field exists in currentData and if it has changed
-      if (formData[key] != currentData[key] && key !== 'memorial_id') {
-        // Add to update payload
-        updatePayload[key] = formData[key];
+      // Check if the field exists in formData and has changed
+      if (formData[key] !== undefined && formData[key] !== currentData[key]) {
+        // Add to update payload only if the value has changed
+        if (formData[key] === '' && currentData[key] === "") {
+          updatePayload[key] = null; // Keep it as null if both are effectively empty
+        } else {
+          updatePayload[key] = formData[key] === '' ? null : formData[key];
+        }
       }
     }
 
-    console.log('Update payload:', updatePayload);
+    // console.log('Update payload:', updatePayload);
 
     if (Object.keys(updatePayload).length === 0) {
       return { message: 'No fields were changed', data: currentData };
@@ -135,7 +133,7 @@ exports.handler = async function (event, context) {
 
     // If it worked, show the memorial ID to the user
     const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
-    const html = await ejs.renderFile(templatePath, { record: null, message: `Record ${memorial_id} has been updated successfully.` });
+    const html = await ejs.renderFile(templatePath, { record: null, message: `Record ${memorial_id} has been updated successfully.`});
 
     return {
       statusCode: 200,
