@@ -72,9 +72,7 @@ async function updateRecordInSupabase(supabase, formData) {
         }
       }
     }
-
     // console.log('Update payload:', updatePayload);
-
     if (Object.keys(updatePayload).length === 0) {
       return { message: 'No fields were changed', data: currentData };
     }
@@ -98,7 +96,6 @@ async function updateRecordInSupabase(supabase, formData) {
 }
 
 exports.handler = async function (event, context) {
-
   // Parse cookies from the request headers
   const cookies = cookie.parse(event.headers.cookie || '');
   const token = cookies.token;
