@@ -47,9 +47,9 @@
             <p>Enter search criteria above to find records.</p>
         <% } else if (records && records.length > 0) { %>
             <p>Found <%= records.length %> record(s) matching your search criteria.</p>
-            <div class="table-responsive">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
                 <% records.forEach(function(record) { %>
-                    <div class="card mb-3">
+                    <div class="card col">
                         <header class="card-header text-center">
                             <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
                         </header>
