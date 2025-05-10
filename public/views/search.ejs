@@ -9,7 +9,7 @@
         </div>
     </header>
 
-    <div class="search-container">
+    <section class="search-container">
         <form action="/search/<%= cemetery %>" method="GET" id="search-form-2" class="search-form">
             <h2>Search Records</h2>
             <p>Enter as many values as known. Leave fields blank for all records.</p>
@@ -39,8 +39,8 @@
             </div>
             <button type="submit">Search</button>
         </form>
-    </div>
-    <div class="results-section">
+    </section>
+    <section class="results-section">
         <h2>Search Results</h2>
         <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
         <% if (!hasSearchParams) { %>
@@ -83,7 +83,7 @@
         <% } else { %>
             No records found matching your search criteria.
         <% } %>
-    </div>
+    </section>
     <footer>
         <p>
             &copy; 2025 MemoraFind. All rights reserved. Created by <a href="https://dyarawilliams.github.io" target="_blank">D'yara Williams</a>
