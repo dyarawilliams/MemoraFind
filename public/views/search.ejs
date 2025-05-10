@@ -47,16 +47,18 @@
             <p>Enter search criteria above to find records.</p>
         <% } else if (records && records.length > 0) { %>
             <p>Found <%= records.length %> record(s) matching your search criteria.</p>
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
                 <% records.forEach(function(record) { %>
                     <div class="card col">
                         <header class="card-header text-center">
                             <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
                         </header>
                         <div class="card-body">
+                                <div class="name-content text-center">
+                                    <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
+                                </div>
                                 <div class="d-flex justify-content-between">
                                     <p class="card-title">Prefix: <%= (record.prefix) ? record.prefix : "N/A" %></p>
-                                    <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
                                     <p class="card-text">Age: <%= record.age_sane %></p>
                                 </div>
                                 <div class="d-flex justify-content-evenly">
