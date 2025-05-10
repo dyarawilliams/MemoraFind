@@ -1,6 +1,6 @@
 /* Base responsive setup */
 :root {
-    --bs-primary: #65aeb5 !important;;
+    --bs-primary: #65aeb5 !important;
     --bs-secondary: #e26f44 !important;
     --bs-primary-rgb: rgb(101, 174, 181) !important;
     --bs-secondary-rgb: rgb(226, 111, 68);
@@ -199,6 +199,10 @@ header, main {
 .results-section span {
     display: block;
     padding-bottom: 2rem;
+}
+
+.card-header {
+    background-color: var(--bs-secondary);
 }
 
 @keyframes fadeInOut {
