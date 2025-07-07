@@ -58,10 +58,6 @@ More features and enhancements are on the way — because every memory matters.
 
 ## Getting Started
 
-<!-- This section should provide instructions for other developers to
-
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system. -->
-
 ### Dependencies
 
 <!-- Describe what software and libraries you will need to install in order to build and use this project. Provide details on how to resolve these dependencies.
