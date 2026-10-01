@@ -1,94 +1,321 @@
-<%- include('partials/header.ejs') %>
+<%
+  /* Everything below is derived only from the locals the functions already
+     pass (see netlify/functions/renderSearch.js and search.js):
 
-<body>
-    <header class="d-flex justify-content-between">
-        <h1>MemoraFind</h1>
-        <div class="d-flex align-items-center">
-            <a href="/" class="btn btn-secondary mx-2">Home</a>
-            <a href="/.netlify/functions/updatePage" class="btn btn-success">Update a Record (requires login)</a>
-        </div>
-    </header>
+       cemetery         "bcmg" | "capernaum" | "honeyford"   (renderSearch only)
+       title            cemetery display name                (renderSearch only)
+       records          array of rows from <cemetery>_data_formatted_2
+       hasSearchParams  true when the request had a query string
 
-    <section class="search-container">
-        <form action="/search/<%= cemetery %>" method="GET" id="search-form-2" class="search-form">
-            <h2>Search Records</h2>
-            <p>Enter as many values as known. Leave fields blank for all records.</p>
-            <div class="name-fields">
-                <div class="form-group">
-                    <label for="firstName">First Name:</label>
-                    <input type="text" id="firstName" name="firstName" placeholder="John" />
+     `locals.x` is used instead of a bare identifier so that the template also
+     renders for netlify/functions/search.js, which passes records only. */
+  var cemeteryCode = (typeof locals.cemetery === "string") ? locals.cemetery : "";
+  var cemeteryName = (typeof locals.title === "string") ? locals.title : "";
+  var rows = Array.isArray(locals.records) ? locals.records : [];
+  var didSearch = (typeof locals.hasSearchParams !== "undefined")
+      ? !!locals.hasSearchParams
+      : rows.length > 0;
+  var hasResults = didSearch && rows.length > 0;
+  var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
+
+  /* The three cemeteries are the literals that renderSearch.js validates
+     against, so the switcher can only offer real destinations. */
+  var cemeteries = [
+    { code: "bcmg", name: "Bamberg County Memory Gardens", short: "Memory Gardens" },
+    { code: "capernaum", name: "Capernaum Cemetery", short: "Capernaum" },
+    { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
+  ];
+%>
+<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+
+        <div class="page">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/#cemeteries">Cemeteries</a></li>
+                        <li aria-current="page"><%= cemeteryName || "Search records" %></li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1><%= cemeteryName || "Search burial records" %></h1>
+                    <p>
+                        Search this cemetery by name, maiden name, or birth and death year.
+                        Partial names are fine &mdash; &ldquo;Wil&rdquo; finds &ldquo;Williams&rdquo;.
+                    </p>
                 </div>
-                <div class="form-group">
-                    <label for="maidenName">Maiden Name:</label>
-                    <input type="text" id="maidenName" name="maidenName" placeholder="Doe" />
-                </div>
-                <div class="form-group">
-                    <label for="lastName">Last Name:</label>
-                    <input type="text" id="lastName" name="lastName" placeholder="Deer" />
-                </div>
-            </div>
-            <div class="date-fields">
-                <div class="form-group">
-                    <label for="birthYear">Birth Year:</label>
-                    <input type="number" id="birthYear" name="birthYear" min="1700" max="2050" placeholder="1952"/>
-                </div>
-                <div>
-                    <label for="deathYear">Death Year:</label>
-                    <input type="number" id="deathYear" name="deathYear" min="1700" max="2050" placeholder="2021" />
-                </div>
-            </div>
-            <button type="submit">Search</button>
-        </form>
-    </section>
-    <section class="results-section">
-        <h2>Search Results</h2>
-        <span>To correct or update a record, contact the admin to log in. Note the ID value of the record you wish to update, as this will be required.</span>
-        <% if (!hasSearchParams) { %>
-            <p>Enter search criteria above to find records.</p>
-        <% } else if (records && records.length > 0) { %>
-            <p>Found <%= records.length %> record(s) matching your search criteria.</p>
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-                <% records.forEach(function(record) { %>
-                    <div class="card col">
-                        <header class="card-header text-center">
-                            <strong class="card-subtitle">ID: <%= record.memorial_id %></strong> 
-                        </header>
-                        <div class="card-body">
-                                <div class="name-content text-center">
-                                    <h5 class="card-text"><%= record.last_name %> <%= record.maiden_name %>, <%= record.first_name %> <%= record.middle_name %> <%= record.suffix %></h5>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <p class="card-title">Prefix: <%= (record.prefix) ? record.prefix : "N/A" %></p>
-                                    <p class="card-text">Age: <%= record.age_sane %></p>
-                                </div>
-                                <div class="d-flex justify-content-evenly">
-                                    <p class="card-text">Birth Date: <%= record.birth_date %></p>
-                                    <p class="card-text">Death Date: <%= record.death_date %></p>
-                                </div>
-                                <div class="d-flex justify-content-evenly">
-                                    <p class="card-text">Section: <%= (record.section) ? record.section : "N/A" %></p>
-                                    <p class="card-text">Lot: <%= (record.lot) ? record.lot : "N/A" %></p>
-                                </div>
-                                <div class="text-center">
-                                    <% if (record.is_vet == "Y") { %>
-                                        <img src="https://img.shields.io/badge/veteran-blue?style=for-the-badge" alt="veteran" />
-                                    <% } else { %>
-                                        <p class="card-text text-center">Veteran: No</p>
-                                    <% } %>
-                                </div>
+
+                <nav class="cemetery-tabs" aria-label="Choose a cemetery">
+                    <ul>
+                        <% cemeteries.forEach(function (cemetery) { %>
+                            <li>
+                                <a class="cemetery-tab<%= (cemetery.code === cemeteryCode) ? ' is-current' : '' %>"
+                                   href="/search/<%= cemetery.code %>"
+                                   data-cemetery-tab="<%= cemetery.code %>"
+                                   <% if (cemetery.code === cemeteryCode) { %>aria-current="page"<% } %>><%= cemetery.name %></a>
+                            </li>
+                        <% }); %>
+                    </ul>
+                </nav>
+
+                <section class="panel panel--search" aria-labelledby="search-form-title">
+                    <h2 id="search-form-title">Search <%= cemeteryName || "records" %></h2>
+                    <p class="panel__intro">
+                        Enter as many values as you know. Leave fields blank to see all records.
+                    </p>
+
+                    <form action="/search/<%= cemeteryCode %>" method="GET" id="search-form-2" class="form__grid" data-search-form>
+                        <%- include('partials/search-fields.ejs', { idPrefix: 'search' }) %>
+
+                        <div class="form__actions">
+                            <button type="submit" class="btn btn--primary">Search records</button>
+                            <a class="btn btn--ghost" href="/search/<%= cemeteryCode %>">Clear filters</a>
                         </div>
-                    </div>
-                <% }); %>
-            </div>
-        <% } else { %>
-            No records found matching your search criteria.
-        <% } %>
-    </section>
-    <footer>
-        <p>
-            &copy; 2025 MemoraFind. All rights reserved. Created by <a href="https://dyarawilliams.github.io" target="_blank">D'yara Williams</a>
-        </p>
-    </footer>
+                    </form>
+                </section>
 
+                <section class="results" aria-labelledby="results-title">
+                    <div class="results__head">
+                        <h2 id="results-title">Search results</h2>
+                        <% if (hasResults) { %>
+                            <p class="results__count">
+                                <%= rows.length %> record<%= rows.length === 1 ? '' : 's' %> found
+                            </p>
+                        <% } else { %>
+                            <p class="results__count">No search yet</p>
+                        <% } %>
+                    </div>
+
+                    <div class="filter-summary" data-filter-summary hidden></div>
+
+                    <div class="notice" role="note">
+                        <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                        </svg>
+                        <p>
+                            <strong>Need a record corrected?</strong> Note the record ID shown on
+                            the card, then contact a library administrator &mdash; signing in lets
+                            you update that record. Records are read-only otherwise.
+                        </p>
+                    </div>
+
+                    <% if (!didSearch) { %>
+                        <div class="empty-state">
+                            <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                                <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                <path d="M11 19.5h10M11 24h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                            <h3>Enter search criteria above to find records</h3>
+                            <p>
+                                Every field is optional. A good first search is just a last name
+                                &mdash; you can add a maiden name or a year afterwards.
+                            </p>
+                            <ul>
+                                <li>Names are matched on any part of the word.</li>
+                                <li>Birth and death years must match the recorded year exactly.</li>
+                                <li>Not here? Try one of the other two cemeteries with the tabs above.</li>
+                            </ul>
+                        </div>
+                    <% } else if (hasResults) { %>
+                        <ul class="records">
+                            <% rows.forEach(function (record) { %>
+                                <%
+                                  var givenNames = [record.first_name, record.middle_name]
+                                      .filter(function (part) { return part && String(part).trim() !== ""; })
+                                      .join(" ");
+                                  var hasSection = record.section !== null && record.section !== undefined && String(record.section).trim() !== "";
+                                  var hasLot = record.lot !== null && record.lot !== undefined && String(record.lot).trim() !== "";
+                                  var hasAge = record.age_sane !== null && record.age_sane !== undefined && String(record.age_sane).trim() !== "";
+                                  var hasBorn = record.birth_date !== null && record.birth_date !== undefined && String(record.birth_date).trim() !== "";
+                                  var hasDied = record.death_date !== null && record.death_date !== undefined && String(record.death_date).trim() !== "";
+                                  var extraParts = ["notes", "moved_from", "moved_to"].filter(function (field) {
+                                      return record[field] !== null && record[field] !== undefined && String(record[field]).trim() !== "";
+                                  });
+                                %>
+                                <li>
+                                    <article class="record">
+                                        <div class="record__head">
+                                            <h3 class="record__name">
+                                                <span class="record__surname"><%= record.last_name %></span><% if (givenNames || record.suffix) { %>,<% } %>
+                                                <% if (givenNames) { %> <span class="record__given"><%= givenNames %></span><% } %>
+                                                <% if (record.suffix) { %> <span class="record__given"><%= record.suffix %></span><% } %>
+                                            </h3>
+                                            <% if (record.maiden_name && String(record.maiden_name).trim() !== "") { %>
+                                                <p class="record__maiden">née <%= record.maiden_name %></p>
+                                            <% } %>
+                                            <ul class="record__badges">
+                                                <li>
+                                                    <span class="badge badge--id">
+                                                        <span class="badge__key">Record ID</span>
+                                                        <strong><%= record.memorial_id %></strong>
+                                                    </span>
+                                                </li>
+                                                <% if (record.prefix && String(record.prefix).trim() !== "") { %>
+                                                    <li><span class="badge badge--neutral"><%= record.prefix %></span></li>
+                                                <% } %>
+                                                <% if (record.is_vet == "Y") { %>
+                                                    <li><span class="badge badge--vet">Veteran</span></li>
+                                                <% } %>
+                                            </ul>
+                                        </div>
+
+                                        <dl class="record__facts">
+                                            <div class="fact<%= hasBorn ? '' : ' fact--muted' %>">
+                                                <dt>Born</dt>
+                                                <dd><%= hasBorn ? record.birth_date : "Not recorded" %></dd>
+                                            </div>
+                                            <div class="fact<%= hasDied ? '' : ' fact--muted' %>">
+                                                <dt>Died</dt>
+                                                <dd><%= hasDied ? record.death_date : "Not recorded" %></dd>
+                                            </div>
+                                            <% if (hasAge) { %>
+                                                <div class="fact">
+                                                    <dt>Age</dt>
+                                                    <dd><%= record.age_sane %></dd>
+                                                </div>
+                                            <% } %>
+                                            <% if (cemeteryName) { %>
+                                                <div class="fact fact--wide">
+                                                    <dt>Cemetery</dt>
+                                                    <dd><%= cemeteryName %></dd>
+                                                </div>
+                                            <% } %>
+                                            <div class="fact fact--wide fact--place<%= (hasSection || hasLot) ? '' : ' fact--muted' %>">
+                                                <dt>Burial location</dt>
+                                                <dd>
+                                                    <% if (hasSection || hasLot) { %>
+                                                        <svg class="pin" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                                            <path d="M10 1.5a6.5 6.5 0 0 0-6.5 6.5c0 4.6 6.5 10.5 6.5 10.5s6.5-5.9 6.5-10.5A6.5 6.5 0 0 0 10 1.5Zm0 9a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2Z" fill="currentColor" />
+                                                        </svg>
+                                                        <span>
+                                                            <% if (hasSection) { %>Section <%= record.section %><% } %>
+                                                            <% if (hasSection && hasLot) { %><span aria-hidden="true"> &middot; </span><% } %>
+                                                            <% if (hasLot) { %>Lot <%= record.lot %><% } %>
+                                                        </span>
+                                                    <% } else { %>
+                                                        Section and lot not recorded
+                                                    <% } %>
+                                                </dd>
+                                            </div>
+                                        </dl>
+
+                                        <% if (extraParts.length > 0) { %>
+                                            <details class="record__extra">
+                                                <summary>More details</summary>
+                                                <dl class="record__facts">
+                                                    <% if (record.notes && String(record.notes).trim() !== "") { %>
+                                                        <div class="fact fact--wide">
+                                                            <dt>Notes</dt>
+                                                            <dd><p><%= record.notes %></p></dd>
+                                                        </div>
+                                                    <% } %>
+                                                    <% if (record.moved_from && String(record.moved_from).trim() !== "") { %>
+                                                        <div class="fact fact--wide">
+                                                            <dt>Moved from</dt>
+                                                            <dd><%= record.moved_from %></dd>
+                                                        </div>
+                                                    <% } %>
+                                                    <% if (record.moved_to && String(record.moved_to).trim() !== "") { %>
+                                                        <div class="fact fact--wide">
+                                                            <dt>Moved to</dt>
+                                                            <dd><%= record.moved_to %></dd>
+                                                        </div>
+                                                    <% } %>
+                                                </dl>
+                                            </details>
+                                        <% } %>
+                                    </article>
+                                </li>
+                            <% }); %>
+                        </ul>
+                    <% } else { %>
+                        <div class="empty-state">
+                            <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                                <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                                <path d="M10 21.5l12-11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                            <h3>No records found matching your search</h3>
+                            <p>
+                                Nothing in <%= cemeteryName || "this cemetery" %> matches what you
+                                entered. Often changing one field is enough to find them.
+                            </p>
+                            <ul>
+                                <li>Check the spelling, or try just the first few letters.</li>
+                                <li>Try the maiden name instead of the married name, or the other way round.</li>
+                                <li>Birth and death years must match exactly &mdash; leave them blank and search by name.</li>
+                            </ul>
+                            <div class="empty-state__actions">
+                                <a class="btn btn--ghost" href="/search/<%= cemeteryCode %>">Clear filters</a>
+                                <% cemeteries.filter(function (cemetery) { return cemetery.code !== cemeteryCode; }).forEach(function (cemetery) { %>
+                                    <a class="btn btn--ghost" href="/search/<%= cemetery.code %>">Try <%= cemetery.short %></a>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% } %>
+                </section>
+            </div>
+        </div>
+
+        <script>
+            /* Keeps the form and the result count honest about the URL the
+               visitor actually asked for: fields are never pre-filled by the
+               server (the functions do not pass the query back), so the values
+               are read from location.search and echoed as chips. Pure
+               progressive enhancement — without JS the results are identical,
+               only the echo is missing. */
+            (function () {
+                var FIELDS = [
+                    ['firstName', 'First name'],
+                    ['maidenName', 'Maiden name'],
+                    ['lastName', 'Last name'],
+                    ['birthYear', 'Birth year'],
+                    ['deathYear', 'Death year']
+                ];
+                var params = new URLSearchParams(window.location.search);
+                var active = [];
+                FIELDS.forEach(function (field) {
+                    var value = params.get(field[0]);
+                    if (value !== null && value !== '') {
+                        active.push({ key: field[0], label: field[1], value: value });
+                    }
+                });
+
+                document.querySelectorAll('[data-search-form]').forEach(function (form) {
+                    active.forEach(function (item) {
+                        var input = form.querySelector('[name="' + item.key + '"]');
+                        if (input && !input.value) input.value = item.value;
+                    });
+                });
+
+                var summary = document.querySelector('[data-filter-summary]');
+                if (summary && active.length) {
+                    var lead = document.createElement('span');
+                    lead.className = 'filter-summary__label';
+                    lead.textContent = 'Showing results for:';
+                    summary.appendChild(lead);
+                    active.forEach(function (item) {
+                        var chip = document.createElement('span');
+                        chip.className = 'chip';
+                        var key = document.createElement('span');
+                        key.className = 'chip__key';
+                        key.textContent = item.label + ':';
+                        chip.appendChild(key);
+                        chip.appendChild(document.createTextNode(' ' + item.value));
+                        summary.appendChild(chip);
+                    });
+                    summary.hidden = false;
+                }
+
+                /* Switching cemetery keeps the search you already ran. */
+                var carrying = params.toString();
+                if (carrying) {
+                    document.querySelectorAll('[data-cemetery-tab]').forEach(function (tab) {
+                        if (tab.getAttribute('aria-current') === 'page') return;
+                        tab.href = tab.href + '?' + carrying;
+                    });
+                }
+            })();
+        </script>
 
 <%- include('partials/footer.ejs') %>

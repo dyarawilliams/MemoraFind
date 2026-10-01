@@ -1,0 +1,290 @@
+/* ==========================================================================
+   MemoraFind — design tokens & base layer
+   --------------------------------------------------------------------------
+   Loaded before styles.css. Holds the colour, type and spacing system, the
+   reset, and the accessible focus style. No utilities, no page layout.
+
+   Colour direction (owner's brief):
+     burgundy  hsl(358, 72%, 21%)  ~ #5c0f12   headers, nav, headings, links
+     gold      hsl(45, 95%, 45%)   ~ #e0a906   fills, borders, accents, focus
+     page bg   #faf8f3                         warm off-white
+
+   CONTRAST RULE (why gold is never body or link text on the cream page):
+     burgundy on #faf8f3 .......... 12.9 : 1  (AAA, used for text + links)
+     near-black on gold fill ......  8.4 : 1  (AAA, used for button labels)
+     gold on burgundy ..............  6.4 : 1  (AA, used for gold text/icons
+                                               inside the burgundy header)
+     gold on #faf8f3 ...............  2.0 : 1  (FAILS — so gold is only used
+                                               here as a fill, a border, an
+                                               underline or a highlight wash,
+                                               never for the text itself)
+   ========================================================================== */
+
+:root {
+    /* ---- Brand colour -------------------------------------------------- */
+    --burgundy: hsl(358, 72%, 21%);         /* #5c0f12  primary */
+    --burgundy-deep: hsl(358, 72%, 15%);    /* pressed / footer ground */
+    --burgundy-mid: hsl(358, 48%, 32%);     /* secondary text on cream */
+    --burgundy-wash: hsl(358, 52%, 96%);    /* tinted panel background */
+    --gold: hsl(45, 95%, 45%);              /* #e0a906  accent fill */
+    --gold-deep: hsl(38, 88%, 34%);         /* gold that may carry text */
+    --gold-soft: hsl(45, 88%, 91%);         /* highlight wash */
+    --gold-line: hsl(45, 70%, 72%);
+
+    /* ---- Neutrals ------------------------------------------------------ */
+    --cream: #faf8f3;                       /* page background */
+    --surface: #ffffff;                     /* cards, panels */
+    --surface-sunk: hsl(40, 30%, 96%);
+    --ink: #241a15;                         /* body text */
+    --ink-soft: #5c5049;                    /* secondary text (7.3:1 on cream) */
+    --line: hsl(35, 18%, 84%);
+    --line-strong: hsl(35, 18%, 68%);
+
+    /* ---- Semantic roles ----------------------------------------------- */
+    --focus-ring: var(--gold);
+    --focus-ring-shadow: 0 0 0 1px var(--burgundy);
+    --danger: hsl(0, 62%, 38%);
+    --danger-wash: hsl(0, 70%, 96%);
+    --success-wash: hsl(150, 40%, 95%);
+    --success-line: hsl(150, 35%, 62%);
+    --success-ink: hsl(158, 45%, 20%);
+
+    /* ---- Type --------------------------------------------------------- */
+    /* Serif for headings (dignified, memorial-appropriate), humanist
+       system sans for the dense record data. No webfont download. */
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
+        "Times New Roman", serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+        Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
+
+    /* Fluid scale. Body copy never drops below 16px so it stays legible on a
+       phone and iOS never zooms a focused input. */
+    --fs-xs: 0.9375rem;                                     /* 15px  meta */
+    --fs-sm: 1rem;                                          /* 16px  small */
+    --fs-base: clamp(1.0625rem, 0.55vw + 0.97rem, 1.125rem); /* 17-18px body */
+    --fs-lg: clamp(1.125rem, 0.7vw + 1rem, 1.25rem);
+    --fs-xl: clamp(1.25rem, 1vw + 1.05rem, 1.5rem);
+    --fs-2xl: clamp(1.5rem, 1.6vw + 1.1rem, 1.875rem);
+    --fs-3xl: clamp(1.875rem, 3vw + 1.1rem, 2.75rem);
+
+    --lh-tight: 1.2;
+    --lh-snug: 1.35;
+    --lh-body: 1.65;
+    --measure: 68ch;
+
+    /* ---- Spacing (4px base) ------------------------------------------- */
+    --sp-1: 0.25rem;
+    --sp-2: 0.5rem;
+    --sp-3: 0.75rem;
+    --sp-4: 1rem;
+    --sp-5: 1.5rem;
+    --sp-6: 2rem;
+    --sp-7: 3rem;
+    --sp-8: 4rem;
+    --sp-9: 6rem;
+
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+
+    --shadow-sm: 0 1px 2px hsl(30 20% 20% / 0.08),
+        0 1px 3px hsl(30 20% 20% / 0.06);
+    --shadow: 0 2px 6px hsl(30 20% 20% / 0.09),
+        0 8px 20px -12px hsl(30 20% 20% / 0.22);
+    --shadow-lg: 0 4px 12px hsl(30 20% 20% / 0.1),
+        0 18px 40px -18px hsl(30 20% 20% / 0.3);
+
+    --container: 1120px;
+    --container-narrow: 760px;
+    --header-h: 4.5rem;
+
+    /* Minimum comfortable touch target on a phone. */
+    --tap: 2.75rem; /* 44px */
+}
+
+/* --------------------------------------------------------------------------
+   Reset / base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+* {
+    margin: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+    /* Anchor jumps on the landing page must clear the sticky header. */
+    scroll-padding-top: calc(var(--header-h) + var(--sp-3));
+    -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+body {
+    font-family: var(--font-body);
+    font-size: var(--fs-base);
+    line-height: var(--lh-body);
+    color: var(--ink);
+    background-color: var(--cream);
+    /* A very soft warm wash so the cream page does not read as flat grey. */
+    background-image: radial-gradient(
+            60rem 30rem at 50% -12rem,
+            hsl(45 80% 92% / 0.55),
+            transparent 70%
+        );
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+    color: var(--burgundy);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+}
+
+h1 {
+    font-size: var(--fs-3xl);
+}
+h2 {
+    font-size: var(--fs-2xl);
+}
+h3 {
+    font-size: var(--fs-xl);
+}
+h4 {
+    font-size: var(--fs-lg);
+}
+
+p {
+    text-wrap: pretty;
+}
+
+/* Text links: burgundy, with a gold underline. Gold carries the underline
+   (a non-text use), burgundy carries the words. */
+a {
+    color: var(--burgundy);
+    text-decoration-line: underline;
+    text-decoration-color: var(--gold-line);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.18em;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+a:hover,
+a:focus-visible {
+    color: var(--burgundy-deep);
+    text-decoration-color: var(--gold-deep);
+}
+
+strong,
+b {
+    font-weight: 650;
+}
+
+img,
+svg,
+picture {
+    display: block;
+    max-width: 100%;
+}
+
+img {
+    height: auto;
+}
+
+ul,
+ol {
+    padding-left: 1.15em;
+}
+
+code,
+kbd,
+samp {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+}
+
+/* --------------------------------------------------------------------------
+   Focus — visible on every interactive element, both on cream and burgundy.
+   The gold 3px ring is outlined by a 1px burgundy shadow so the indicator
+   itself keeps >3:1 contrast against light and dark surfaces alike.
+   -------------------------------------------------------------------------- */
+
+:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring-shadow);
+    border-radius: var(--radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Layout helpers
+   -------------------------------------------------------------------------- */
+
+.container {
+    width: 100%;
+    max-width: var(--container);
+    margin-inline: auto;
+    padding-inline: var(--sp-4);
+}
+
+@media (min-width: 640px) {
+    .container {
+        padding-inline: var(--sp-6);
+    }
+}
+
+.site-main {
+    flex: 1 0 auto;
+    display: block;
+}
+
+.section {
+    padding-block: var(--sp-6);
+}
+
+@media (min-width: 860px) {
+    .section {
+        padding-block: var(--sp-7);
+    }
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

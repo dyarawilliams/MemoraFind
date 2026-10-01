@@ -1,79 +1,173 @@
-<%- include('partials/header.ejs') %>
+<%- include('partials/header.ejs', { pageTitle: 'MemoraFind — Bamberg County, South Carolina cemetery records' }) %>
 
-<body>
-    <div class="wrapper">
-        <header class="d-flex justify-content-between">
-            <h1>MemoraFind</h1>
-            <div class="d-flex align-items-center">
-                <a href="/.netlify/functions/updatePage" class="btn btn-success">Update a Record(requires login)</a>
-            </div>
-        </header>
-        <main>
-            <div class="search-container">
-                <form action="/search" method="GET" id="search-form-1" class="search-form">
-                    <h2>Bamberg County (SC) Cemetery Quick Search</h2>
-                    <select name="cemetery" id="cemetery-select" required>
-                        <option value="">Select Cemetery</option>
-                        <option value="bcmg">Bamberg County Memory Gardens</option>
-                        <option value="capernaum">Capernaum Cemetery</option>
-                        <option value="honeyford">Honey Ford Cemetery</option>
-                    </select>
-                    <button type="submit">Search</button>
-                </form>
-            </div>
-                
-            <div class="cemetery-grid">
-                <div class="cemetery-card" data-cemetery="bcmg">
-                    <h2>Bamberg County Memory Gardens</h2>
-                    <img src="assets/bcmg.jpg" alt="Bamberg County Memory Gardens sign">
-                    <p>Located on Highway 301 between Denmark and Bamberg.</p>
-                    <a href="/search/bcmg" class="cemetery-link">Search Records</a>
-                </div>
-                
-                <div class="cemetery-card" data-cemetery="capernaum">
-                    <h2>Capernaum Cemetery</h2>
-                    <img src="assets/placeholder.png" alt="Capernaum Cemetery">
-                    <p>Located on Capernaum Road in Denmark, South Carolina.</p>
-                    <a href="/search/capernaum" class="cemetery-link">Search Records</a>
-                </div>
-
-                <div class="cemetery-card" data-cemetery="honeyford">
-                    <h2>Honey Ford Cemetery</h2>
-                    <img src="assets/honey-ford-cemetery.jpeg" alt="Honey Ford Cemetery sign">
-                    <p>Located on Honey Ford Road in Govan, South Carolina.</p>
-                    <a href="/search/honeyford" class="cemetery-link">Search Records</a>
+        <section class="hero">
+            <div class="container hero__inner">
+                <p class="eyebrow">Bamberg County, South Carolina</p>
+                <h1>Every name deserves to be remembered.</h1>
+                <p class="hero__lede">
+                    Find where a loved one rests. Search the burial records of Bamberg County's
+                    cemeteries by name, maiden name, or the year they were born and died, and see
+                    the section and lot where they are buried.
+                </p>
+                <div class="hero__actions">
+                    <a class="btn btn--primary" href="#search">Search the records</a>
+                    <a class="btn btn--ghost" href="#cemeteries">Browse the cemeteries</a>
                 </div>
             </div>
-        </main>
-    </div>
-        
-    <footer>
-        <p>
-            &copy; 2025 MemoraFind. All rights reserved. Created by <a href="https://dyarawilliams.github.io" target="_blank">D'yara Williams</a>
-        </p>
-    </footer>
+        </section>
 
-    <script>
-        document.getElementById('cemetery-select').addEventListener('change', function() {
-            const selectedCemetery = this.value;
-            const cards = document.querySelectorAll('.cemetery-card');
-            
-            cards.forEach(card => {
-                if (!selectedCemetery || card.dataset.cemetery === selectedCemetery) {
-                    card.classList.remove('hidden');
-                } else {
-                    card.classList.add('hidden');
-                }
-            });
-        });
+        <section class="section" id="search" aria-labelledby="search-panel-title">
+            <div class="container">
+                <div class="panel panel--search panel--overlap">
+                    <h2 id="search-panel-title">Search burial records</h2>
+                    <p class="panel__intro">
+                        Choose a cemetery, then enter as much as you know. Every field is optional
+                        except the cemetery — the more you enter, the narrower the search.
+                    </p>
 
-        document.getElementById('search-form-1').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const cemetery = document.getElementById('cemetery-select').value;
-            
-            if (cemetery) {
-                window.location.href = `/search/${cemetery}`;
-            }
-        });
-    </script>
+                    <form action="/search" method="GET" id="search-form-1" class="form__grid" data-search-form>
+                        <div class="field">
+                            <label for="cemetery-select">Cemetery</label>
+                            <select name="cemetery" id="cemetery-select" required>
+                                <option value="">Select a cemetery&hellip;</option>
+                                <option value="bcmg">Bamberg County Memory Gardens</option>
+                                <option value="capernaum">Capernaum Cemetery</option>
+                                <option value="honeyford">Honey Ford Cemetery</option>
+                            </select>
+                        </div>
+
+                        <%- include('partials/search-fields.ejs', { idPrefix: 'home' }) %>
+
+                        <div class="form__actions">
+                            <button type="submit" class="btn btn--primary">Search records</button>
+                            <button type="reset" class="btn btn--ghost">Reset</button>
+                        </div>
+                    </form>
+
+                    <p class="panel__foot">
+                        Leave any field blank to see every record in that cemetery. Records can be
+                        corrected by a library administrator — see
+                        <a href="/.netlify/functions/updatePage">Update a record</a>.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="cemeteries" aria-labelledby="cemeteries-title">
+            <div class="container">
+                <div class="section-head">
+                    <h2 id="cemeteries-title">Cemeteries in Bamberg County</h2>
+                    <p>Three cemeteries are recorded here today. Choose one to browse its records.</p>
+                </div>
+
+                <div class="cemetery-grid">
+                    <article class="cemetery-card" data-cemetery="bcmg">
+                        <div class="cemetery-card__media">
+                            <img src="/assets/bcmg.jpg" alt="The sign at Bamberg County Memory Gardens" />
+                        </div>
+                        <div class="cemetery-card__body">
+                            <h3>Bamberg County Memory Gardens</h3>
+                            <p>Located on Highway 301 between Denmark and Bamberg.</p>
+                            <a href="/search/bcmg" class="btn btn--secondary cemetery-card__link">Search this cemetery</a>
+                        </div>
+                    </article>
+
+                    <article class="cemetery-card" data-cemetery="capernaum">
+                        <div class="cemetery-card__media">
+                            <img src="/assets/placeholder.png" alt="Capernaum Cemetery" />
+                        </div>
+                        <div class="cemetery-card__body">
+                            <h3>Capernaum Cemetery</h3>
+                            <p>Located on Capernaum Road in Denmark, South Carolina.</p>
+                            <a href="/search/capernaum" class="btn btn--secondary cemetery-card__link">Search this cemetery</a>
+                        </div>
+                    </article>
+
+                    <article class="cemetery-card" data-cemetery="honeyford">
+                        <div class="cemetery-card__media">
+                            <img src="/assets/honey-ford-cemetery.jpeg" alt="The sign at Honey Ford Cemetery" />
+                        </div>
+                        <div class="cemetery-card__body">
+                            <h3>Honey Ford Cemetery</h3>
+                            <p>Located on Honey Ford Road in Govan, South Carolina.</p>
+                            <a href="/search/honeyford" class="btn btn--secondary cemetery-card__link">Search this cemetery</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" aria-labelledby="how-title">
+            <div class="container">
+                <div class="section-head">
+                    <h2 id="how-title">How it works</h2>
+                </div>
+
+                <ol class="steps">
+                    <li>
+                        <h3>Search by name or dates</h3>
+                        <p>
+                            Enter a last name, a maiden name, or a birth or death year. Partial
+                            names are fine &mdash; &ldquo;Wil&rdquo; finds &ldquo;Williams&rdquo;.
+                        </p>
+                    </li>
+                    <li>
+                        <h3>See where the grave is</h3>
+                        <p>
+                            Each result shows the cemetery, the section and the lot, so you can
+                            find your way once you are there.
+                        </p>
+                    </li>
+                    <li>
+                        <h3>Keep the record accurate</h3>
+                        <p>
+                            Spotted a mistake? Note the record ID, then
+                            <a href="/.netlify/functions/updatePage">sign in</a> as a library
+                            administrator to correct it.
+                        </p>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <script>
+            /* The quick-search form needs the chosen cemetery in the *path*
+               (/search/<cemetery>), which a plain form action cannot build, so
+               the submit is intercepted and the URL assembled here. Same
+               behaviour as before the redesign, with the name and date fields
+               now carried along as query-string parameters — which
+               renderSearch.js already reads. */
+            (function () {
+                var form = document.getElementById('search-form-1');
+                var select = document.getElementById('cemetery-select');
+                if (!form || !select) return;
+
+                form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    if (!select.value) {
+                        select.focus();
+                        return;
+                    }
+                    var params = new URLSearchParams();
+                    new FormData(form).forEach(function (value, key) {
+                        if (key === 'cemetery') return;
+                        if (value !== '' && value !== null) params.append(key, value);
+                    });
+                    var query = params.toString();
+                    window.location.href =
+                        '/search/' + encodeURIComponent(select.value) + (query ? '?' + query : '');
+                });
+
+                /* Existing behaviour kept: choosing a cemetery dims the cards
+                   for the other cemeteries. */
+                select.addEventListener('change', function () {
+                    var chosen = this.value;
+                    document.querySelectorAll('.cemetery-card').forEach(function (card) {
+                        var match = !chosen || card.dataset.cemetery === chosen;
+                        card.classList.toggle('is-hidden', !match);
+                    });
+                });
+            })();
+        </script>
+
 <%- include('partials/footer.ejs') %>
