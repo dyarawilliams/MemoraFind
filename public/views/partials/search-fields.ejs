@@ -1,0 +1,34 @@
+<%
+  /* Shared name / maiden-name / birth & death year fields.
+     - The input `name` attributes are the exact query-string keys that
+       netlify/functions/renderSearch.js reads: firstName, maidenName,
+       lastName, birthYear, deathYear. Do not rename them.
+     - `idPrefix` keeps the `for`/`id` pairs unique when a page contains more
+       than one search form (the landing page has two). */
+  var _prefix = (typeof idPrefix !== "undefined" && idPrefix) ? idPrefix : "q";
+  var _p = function (field) { return _prefix + "-" + field; };
+%>
+<div class="form__row form__row--3">
+    <div class="field">
+        <label for="<%= _p('firstName') %>">First name</label>
+        <input type="text" id="<%= _p('firstName') %>" name="firstName" placeholder="John" autocomplete="off" />
+    </div>
+    <div class="field">
+        <label for="<%= _p('maidenName') %>">Maiden name</label>
+        <input type="text" id="<%= _p('maidenName') %>" name="maidenName" placeholder="Doe" autocomplete="off" />
+    </div>
+    <div class="field">
+        <label for="<%= _p('lastName') %>">Last name</label>
+        <input type="text" id="<%= _p('lastName') %>" name="lastName" placeholder="Deer" autocomplete="off" />
+    </div>
+</div>
+<div class="form__row form__row--2">
+    <div class="field">
+        <label for="<%= _p('birthYear') %>">Birth year</label>
+        <input type="number" id="<%= _p('birthYear') %>" name="birthYear" min="1700" max="2050" inputmode="numeric" placeholder="1952" />
+    </div>
+    <div class="field">
+        <label for="<%= _p('deathYear') %>">Death year</label>
+        <input type="number" id="<%= _p('deathYear') %>" name="deathYear" min="1700" max="2050" inputmode="numeric" placeholder="2021" />
+    </div>
+</div>

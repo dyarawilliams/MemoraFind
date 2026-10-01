@@ -1,123 +1,194 @@
-<%- include('partials/header.ejs') %>
-<body>
-    <header class="d-flex justify-content-between">
-        <h1>MemoraFind</h1>
-        <div class="d-flex align-items-center">
-            <form action="/" method="get" class="me-2">
-                <button type="submit" class="btn btn-primary">Return Home</button>
-            </form>
-            
-            <form action="/.netlify/functions/logout" method="get">
-                <button type="submit" class="btn btn-danger">Logout</button>
-            </form>
+<%
+  /* Presentational only: updateRecord.js reports success and failure through
+     the same `message` local, so the notice tone is picked from the wording.
+     Nothing about the update itself depends on this. */
+  var isSuccessMessage = (typeof locals.message === "string")
+      && locals.message.toLowerCase().indexOf("success") !== -1;
+%>
+<%- include('partials/header.ejs', { pageTitle: 'Update a grave record — MemoraFind' }) %>
+
+        <div class="page">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li aria-current="page">Update a grave record</li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1>Update a grave record</h1>
+                    <p>
+                        Enter the memorial ID of a specific record to see its information, make the
+                        changes needed, then save them back to the database.
+                    </p>
+                </div>
+
+                <div class="page__toolbar">
+                    <form action="/" method="get">
+                        <button type="submit" class="btn btn--ghost">Return home</button>
+                    </form>
+
+                    <form action="/.netlify/functions/logout" method="get">
+                        <button type="submit" class="btn btn--danger">Logout</button>
+                    </form>
+                </div>
+
+                <section class="panel" aria-labelledby="lookup-title">
+                    <h2 id="lookup-title">Find a record</h2>
+                    <p class="panel__intro">
+                        The memorial ID is shown on each search result card as &ldquo;Record ID&rdquo;.
+                    </p>
+
+                    <form action="/.netlify/functions/getUpdateRecord" method="get" class="form__grid">
+                        <div class="field">
+                            <label for="memorial_id">Interment ID to update</label>
+                            <input type="number" id="memorial_id" name="memorial_id" inputmode="numeric" required />
+                        </div>
+                        <div class="form__actions">
+                            <button type="submit" class="btn btn--primary">Search</button>
+                        </div>
+                    </form>
+                </section>
+
+                <% if (record) { %>
+                    <section class="results" aria-labelledby="record-title">
+                        <div class="results__head">
+                            <h2 id="record-title">Search results</h2>
+                            <p class="results__count">Memorial ID <%= record.memorial_id %></p>
+                        </div>
+
+                        <p class="page__lede">
+                            Make changes as needed, then click &ldquo;Update This Record&rdquo; to save
+                            the changes to the database. Please verify the changes are accurate prior
+                            to saving.
+                        </p>
+
+                        <form action="/.netlify/functions/updateRecord" method="POST" class="panel page-form">
+                            <div class="field">
+                                <label for="memorial_id_readonly">Memorial ID</label>
+                                <input type="number" id="memorial_id_readonly" name="memorial_id" value="<%= record.memorial_id %>" readonly />
+                                <p class="field__hint">The memorial ID cannot be changed here.</p>
+                            </div>
+
+                            <fieldset>
+                                <legend>Name</legend>
+                                <div class="form__pair--name">
+                                    <div class="field">
+                                        <label for="first_name">First name</label>
+                                        <input type="text" id="first_name" name="first_name" value="<%= record.first_name %>" required />
+                                    </div>
+                                    <div class="field">
+                                        <label for="middle_name">Middle name</label>
+                                        <input type="text" id="middle_name" name="middle_name" value="<%= record.middle_name %>" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="maiden_name">Maiden name</label>
+                                        <input type="text" id="maiden_name" name="maiden_name" value="<%= record.maiden_name %>" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="last_name">Last name</label>
+                                        <input type="text" id="last_name" name="last_name" value="<%= record.last_name %>" required />
+                                    </div>
+                                    <div class="field">
+                                        <label for="suffix">Suffix</label>
+                                        <input type="text" id="suffix" name="suffix" value="<%= record.suffix %>" />
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset>
+                                <legend>Veteran</legend>
+                                <div class="choice-group">
+                                    <span class="label" id="is_vet_label">Is a vet:</span>
+                                    <% if (record.is_vet == "Y") { %>
+                                        <span class="choice">
+                                            <input type="radio" id="is_vet1" name="is_vet" value="Y" checked />
+                                            <label for="is_vet1">Yes</label>
+                                        </span>
+                                        <span class="choice">
+                                            <input type="radio" id="is_vet2" name="is_vet" value="" />
+                                            <label for="is_vet2">No</label>
+                                        </span>
+                                    <% } else { %>
+                                        <span class="choice">
+                                            <input type="radio" id="is_vet3" name="is_vet" value="Y" />
+                                            <label for="is_vet3">Yes</label>
+                                        </span>
+                                        <span class="choice">
+                                            <input type="radio" id="is_vet4" name="is_vet" value="" checked />
+                                            <label for="is_vet4">No</label>
+                                        </span>
+                                    <% } %>
+                                </div>
+                            </fieldset>
+
+                            <fieldset>
+                                <legend>Dates</legend>
+                                <div class="form__pair">
+                                    <div class="field">
+                                        <label for="birth_year">Birth year</label>
+                                        <input type="number" id="birth_year" name="birth_year" value="<%= record.birth_year %>" min="1700" max="2026" required />
+                                    </div>
+                                    <div class="field">
+                                        <label for="birth_month">Birth month</label>
+                                        <input type="text" id="birth_month" name="birth_month" value="<%= record.birth_month %>" required />
+                                    </div>
+                                    <div class="field">
+                                        <label for="birth_day">Birth day</label>
+                                        <input type="number" id="birth_day" name="birth_day" value="<%= record.birth_day %>" min="1" max="31" required />
+                                    </div>
+                                    <div class="field">
+                                        <label for="death_year">Death year</label>
+                                        <input type="number" id="death_year" name="death_year" value="<%= record.death_year %>" min="1700" max="2026" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="death_month">Death month</label>
+                                        <input type="text" id="death_month" name="death_month" value="<%= record.death_month %>" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="death_day">Death day</label>
+                                        <input type="number" id="death_day" name="death_day" value="<%= record.death_day %>" min="1" max="31" />
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset>
+                                <legend>Burial location</legend>
+                                <div class="form__pair">
+                                    <div class="field">
+                                        <label for="section">Section</label>
+                                        <input type="text" id="section" name="section" value="<%= record.section %>" />
+                                    </div>
+                                    <div class="field">
+                                        <label for="lot">Lot</label>
+                                        <input type="text" id="lot" name="lot" value="<%= record.lot %>" />
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <div class="form__actions">
+                                <button type="submit" class="btn btn--primary">Update This Record</button>
+                                <a class="btn btn--ghost" href="/search/update">Start over</a>
+                            </div>
+                        </form>
+                    </section>
+                <% } else if (typeof locals.message !== "undefined" && locals.message) { %>
+                    <p class="notice <%= isSuccessMessage ? 'notice--success' : 'notice--info' %>" role="status">
+                        <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                        </svg>
+                        <span><%= locals.message %></span>
+                    </p>
+                <% } else { %>
+                    <p class="notice notice--info" role="status">
+                        <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                        </svg>
+                        <span>Enter a valid memorial ID to search.</span>
+                    </p>
+                <% } %>
+            </div>
         </div>
-    </header>
 
-    <main>
-        <h2 class="pt-4">Update a Grave Record</h2>
-        <p>Enter the Memorial ID of a specific record to see its information.</p>
-        <p>Make changes as needed, then click "Update This Record" to save the changes to the database. Please verify the changes are accurate prior to saving.</p>
-        <form action="/.netlify/functions/getUpdateRecord" method="get">
-            <label for="memorial_id">Interment ID to Update:</label>
-            <input type="number" id="memorial_id" name="memorial_id" required />
-            <button type="submit">Search</button>
-        </form>
-        <h1>Search Results</h1>
-        <% if(record) { %>
-            <!-- <pre><%= JSON.stringify(record, null, 2) %></pre> -->
-            <p>Make changes as needed, then click "Update This Record" to save the changes to the database. Please verify the changes are accurate prior to saving.</p>
-            <form action="/.netlify/functions/updateRecord" method="POST">
-                <label for="memorial_id">Memorial ID:</label>
-                <input type="number" name="memorial_id" value="<%= record.memorial_id %>" readonly />
-                <div class="form-group">
-                    <label for="first_name">First Name:</label>
-                    <input type="text" id="first_name" name="first_name" value="<%= record.first_name %>" required />
-                </div>
-                <div class="form-group">
-                    <label for="middle_name">Middle Name:</label>
-                    <input type="text" id="middle_name" name="middle_name" value="<%= record.middle_name %>" />
-                </div>
-                <div class="form-group">
-                    <label for="maiden_name">Maiden Name:</label>
-                    <input type="text" id="maiden_name" name="maiden_name" value="<%= record.maiden_name %>" />
-                </div>
-                <div class="form-group">
-                    <label for="last_name">Last Name:</label>
-                    <input type="text" id="last_name" name="last_name" value="<%= record.last_name %>" required />
-                </div>
-                <div class="form-group">
-                    <label for="suffix">Suffix:</label>
-                    <input type="text" id="suffix" name="suffix" value="<%= record.suffix %>" />
-                </div>
-                <div class="d-flex">
-                    <p>Is a Vet: </p>
-                    <% if (record.is_vet == "Y") { %>
-                        <div class="form-check">
-                            <input type="radio" class="form-check-input" id="is_vet1" name="is_vet" value="Y" checked />
-                            <label for="is_vet1" class="form-check-label">Yes</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="radio" class="form-check-input" id="is_vet2" name="is_vet" value="" />
-                            <label for="is_vet2" class="form-check-label">No</label>
-                        </div>
-                    <% } else { %>
-                        <div class="form-check">
-                            <input type="radio" class="form-check-input" id="is_vet3" name="is_vet" value="Y" />
-                            <label for="is_vet3" class="form-check-label">Yes</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="radio" class="form-check-input" id="is_vet4" name="is_vet" value="" checked/>
-                            <label for="is_vet4" class="form-check-label">No</label>
-                        </div>
-                    <% } %>
-                </div>
-                <div class="form-group">
-                    <label for="birth_year">Birth Year:</label>
-                    <input type="number" id="birth_year" name="birth_year" value="<%= record.birth_year %>" min="1700" max="2026" required />
-                </div>
-                <div class="form-group">
-                    <label for="birth_month">Birth Month:</label>
-                    <input type="text" id="birth_month" name="birth_month" value="<%= record.birth_month %>" required />
-                </div>
-                <div class="form-group">
-                    <label for="birth_day">Birth Day:</label>
-                    <input type="number" id="birth_day" name="birth_day" value="<%= record.birth_day %>" min="1" max="31" required />
-                </div>
-                <div class="form-group">
-                    <label for="death_year">Death Year:</label>
-                    <input type="number" id="death_year" name="death_year" value="<%= record.death_year %>" min="1700" max="2026" />    
-                </div>
-                <div class="form-group">
-                    <label for="death_month">Death Month:</label>
-                    <input type="text" id="death_month" name="death_month" value="<%= record.death_month %>" />
-                </div>
-                <div class="form-group">
-                    <label for="death_day">Death Day:</label>
-                    <input type="number" id="death_day" name="death_day" value="<%= record.death_day %>" min="1" max="31" />
-                </div>
-                <div class="form-group">
-                    <label for="section">Section:</label>
-                    <input type="text" id="section" name="section" value="<%= record.section %>" />
-                </div>
-                <div class="form-group">
-                    <label for="lot">Lot:</label>
-                    <input type="text" id="lot" name="lot" value="<%= record.lot %>" />
-                </div>
-                <button type="submit">Update This Record</button>
-            </form>
-        <% } else if (message) { %>
-            <p><%= message %></p>
-        
-        <% } else {  %>
-            <p>Enter a valid Memorial ID to search.</p>
-        <% } %> 
-    </main>
-
-    <footer>
-        <p>
-            &copy; 2025 MemoraFind. All rights reserved. Created by <a href="https://dyarawilliams.github.io" target="_blank">D'yara Williams</a>
-        </p>
-    </footer>
-    
-    
 <%- include('partials/footer.ejs') %>
