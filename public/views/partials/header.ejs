@@ -1,10 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MemoraFind</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
-    <link rel="stylesheet" href="/css/styles.css">
+    <meta name="theme-color" content="hsl(358, 72%, 21%)" />
+    <%
+      /* pageTitle is supplied by each template through include(... , { pageTitle }) */
+      var _pageTitle = (typeof pageTitle !== "undefined" && pageTitle)
+          ? pageTitle
+          : "MemoraFind — Bamberg County cemetery records";
+    %>
+    <title><%= _pageTitle %></title>
+    <meta name="description" content="MemoraFind is a free grave-finder for Bamberg County, South Carolina: search burial records from Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery by name, maiden name, birth or death year." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235c0f12'/%3E%3Cpath d='M7 26V15a9 9 0 0 1 18 0v11' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 19h8M12 23h5' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/styles.css" />
 </head>
+<body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header" data-site-header>
+        <div class="container site-header__inner">
+            <a class="brand" href="/">
+                <svg class="brand__mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                    <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M11 19.5h10M11 24h6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+                </svg>
+                <span class="brand__text">
+                    <span class="brand__name">MemoraFind</span>
+                    <span class="brand__tag">Bamberg County, SC</span>
+                </span>
+            </a>
+
+            <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+                <span class="nav-toggle__bars" aria-hidden="true"></span>
+                <span class="nav-toggle__label">Menu</span>
+            </button>
+
+            <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+                <ul class="site-nav__list">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/#search">Search records</a></li>
+                    <li><a href="/#cemeteries">Cemeteries</a></li>
+                    <li>
+                        <a class="site-nav__admin" href="/.netlify/functions/updatePage">
+                            Update a record
+                            <span class="site-nav__hint">admin login</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main" class="site-main">

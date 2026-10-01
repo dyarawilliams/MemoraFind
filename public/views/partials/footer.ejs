@@ -1,3 +1,70 @@
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/js/bootstrap.bundle.min.js" integrity="sha384-k6d4wzSIapyDyv1kpU366/PK5hCdSbCRGRCMv+eplOQJWyd1fbcAu9OCUj5zNLiq" crossorigin="anonymous"></script>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container site-footer__inner">
+            <div class="site-footer__brand">
+                <p class="site-footer__name">MemoraFind</p>
+                <p>
+                    Burial records for Bamberg County, South Carolina — Bamberg County Memory
+                    Gardens, Capernaum Cemetery and Honey Ford Cemetery. Free to search, always.
+                </p>
+            </div>
+
+            <nav class="site-footer__nav" aria-label="Footer navigation">
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/#search">Search records</a></li>
+                    <li><a href="/#cemeteries">Cemeteries</a></li>
+                    <li><a href="/.netlify/functions/updatePage">Update a record</a></li>
+                </ul>
+            </nav>
+
+            <div class="site-footer__meta">
+                <p>&copy; 2025 MemoraFind. All rights reserved.</p>
+                <p>
+                    Created by
+                    <a href="https://dyarawilliams.github.io" target="_blank" rel="noopener">D'yara Williams</a>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /* Mobile navigation toggle. No framework, no dependency: the button
+           flips aria-expanded and a class on the header, and CSS does the rest
+           (the nav is only collapsible below the 860px breakpoint). */
+        (function () {
+            var header = document.querySelector('[data-site-header]');
+            var toggle = document.querySelector('[data-nav-toggle]');
+            if (!header || !toggle) return;
+
+            function setOpen(open) {
+                header.classList.toggle('is-nav-open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+
+            toggle.addEventListener('click', function () {
+                setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+            });
+
+            /* Escape closes the menu and returns focus to the button. */
+            header.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+                    setOpen(false);
+                    toggle.focus();
+                }
+            });
+
+            /* A click outside the header closes it. */
+            document.addEventListener('click', function (event) {
+                if (!header.contains(event.target)) setOpen(false);
+            });
+
+            /* Leaving the mobile breakpoint resets the state. */
+            window.addEventListener('resize', function () {
+                if (window.innerWidth >= 860) setOpen(false);
+            });
+        })();
+    </script>
 </body>
 </html>
