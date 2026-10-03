@@ -22,7 +22,75 @@
      renderSearch.js has already asked for only its first 50 records. */
   var isBrowse = !didSearch && rows.length > 0;
   var hasResults = rows.length > 0;
+  /* renderSearch.js sets this when a hand-typed birth or death year is not a
+     number: the query is never run, so the page has to say the input is wrong
+     rather than report a database problem. */
+  var invalidYears = Array.isArray(locals.invalidYears) ? locals.invalidYears : [];
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
+
+  /* ------------------------------------------------------------------------
+     Display-only date handling.
+
+     birth_date / death_date arrive from the <cemetery>_data_formatted_2 view
+     as a month/day/year string in which a part that was never recorded is
+     written as zero: "00/0/1967" (year only), "03/0/1886" (month and year),
+     "07/0", "02/14/0" and "00/0/0" (nothing recorded). A zero is a placeholder,
+     not a day, a month or a year, so it must never be printed as one.
+
+     Nothing here changes what is read or how it is queried: the value is
+     formatted for display, the parts that exist are shown in the page's
+     existing month/day/year style, and a value with no usable part at all
+     falls back to the same "Not recorded" wording the cards already use.
+     ---------------------------------------------------------------------- */
+  var DATE_PART = /^\d+$/;
+  var MONTH_NAME = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*$/i;
+
+  function formatRecordedDate(raw) {
+      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
+      if (text === "") return null;
+
+      /* Numbers, month names and separators only — anything else (a stray
+         "Not recorded" stored in the column, say) is not a date we can show. */
+      var tokens = text.split(/[^0-9A-Za-z]+/).filter(function (part) { return part !== ""; });
+      if (tokens.length === 0) return null;
+      var usable = tokens.every(function (part) {
+          return DATE_PART.test(part) || MONTH_NAME.test(part);
+      });
+      if (!usable) return null;
+
+      /* Drop the zero placeholders. */
+      var parts = tokens.filter(function (part) { return !/^0+$/.test(part); });
+      if (parts.length === 0) return null;
+
+      /* The four-digit part is the year wherever it sits; whatever is left
+         keeps its order, so month comes before day. */
+      var year = null;
+      var rest = [];
+      parts.forEach(function (part) {
+          if (year === null && /^\d{4}$/.test(part)) { year = part; return; }
+          rest.push(part);
+      });
+      var month = rest.length > 0 ? rest[0] : null;
+      var day = rest.length > 1 ? rest[1] : null;
+
+      var shown = [];
+      if (month) shown.push(month);
+      /* A day on its own is not a date we can show, so it goes with the month. */
+      if (day && month) shown.push(day);
+      if (year) shown.push(year);
+      return shown.length > 0 ? shown.join("/") : null;
+  }
+
+  /* The view computes 0 for an age it could not work out (and for a death in
+     the same year as the birth). A 0 is never printed as an age. */
+  function formatRecordedAge(raw) {
+      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
+      if (!DATE_PART.test(text)) return null;
+      var years = parseInt(text, 10);
+      return years > 0 ? String(years) : null;
+  }
+
+  var MISSING_TEXT = "Not recorded";
 
   /* The three cemeteries are the literals that renderSearch.js validates
      against, so the switcher can only offer real destinations. */
@@ -84,12 +152,20 @@
                 <section class="results" aria-labelledby="results-title">
                     <div class="results__head">
                         <h2 id="results-title">Search results</h2>
-                        <% if (dbUnavailable) { %>
+                        <% if (invalidYears.length > 0) { %>
+                            <p class="results__count">Search not run</p>
+                        <% } else if (dbUnavailable) { %>
                             <p class="results__count">Records temporarily unavailable</p>
                         <% } else if (hasResults) { %>
                             <p class="results__count">
                                 <%= rows.length %> record<%= rows.length === 1 ? '' : 's' %><%= didSearch ? ' found' : '' %>
                             </p>
+                        <% } else if (didSearch) { %>
+                            <% /* A search that matched nothing is a result, so it is
+                                   counted like one: "0 records found" agrees with the
+                                   empty state below instead of claiming no search has
+                                   been run. */ %>
+                            <p class="results__count">0 records found</p>
                         <% } else { %>
                             <p class="results__count">No search yet</p>
                         <% } %>
@@ -115,7 +191,26 @@
                         </p>
                     </div>
 
-                    <% if (dbUnavailable) { %>
+                    <% if (invalidYears.length > 0) { %>
+                        <div class="empty-state" role="alert">
+                            <svg class="empty-state__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                <path d="M10 1.6 19 18H1L10 1.6Zm0 5.5a1 1 0 0 0-1 1v3.4a1 1 0 0 0 2 0V8.1a1 1 0 0 0-1-1Zm0 7.9a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z" fill="currentColor" />
+                            </svg>
+                            <h3>That is not a valid year</h3>
+                            <p>
+                                A birth or death year is a four-digit number &mdash; for example
+                                <strong>1952</strong>. We did not run this search, so this page
+                                says nothing about who is or is not recorded here.
+                            </p>
+                            <ul>
+                                <li>Correct the year, or leave the year fields blank.</li>
+                                <li>The records themselves are fine &mdash; this is a message about what was typed.</li>
+                            </ul>
+                            <div class="empty-state__actions">
+                                <a class="btn btn--ghost" href="/search/<%= cemeteryCode %>">Clear the search and browse the records</a>
+                            </div>
+                        </div>
+                    <% } else if (dbUnavailable) { %>
                         <div class="empty-state" role="status">
                             <svg class="empty-state__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                                 <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
@@ -152,9 +247,12 @@
                                       .join(" ");
                                   var hasSection = record.section !== null && record.section !== undefined && String(record.section).trim() !== "";
                                   var hasLot = record.lot !== null && record.lot !== undefined && String(record.lot).trim() !== "";
-                                  var hasAge = record.age_sane !== null && record.age_sane !== undefined && String(record.age_sane).trim() !== "";
-                                  var hasBorn = record.birth_date !== null && record.birth_date !== undefined && String(record.birth_date).trim() !== "";
-                                  var hasDied = record.death_date !== null && record.death_date !== undefined && String(record.death_date).trim() !== "";
+                                  /* Dates and age are formatted for display only: a zero part
+                                     the view wrote as a placeholder is not shown as a real day,
+                                     month, year or age (see formatRecordedDate above). */
+                                  var bornDate = formatRecordedDate(record.birth_date);
+                                  var diedDate = formatRecordedDate(record.death_date);
+                                  var ageYears = formatRecordedAge(record.age_sane);
                                   var extraParts = ["notes", "moved_from", "moved_to"].filter(function (field) {
                                       return record[field] !== null && record[field] !== undefined && String(record[field]).trim() !== "";
                                   });
@@ -187,18 +285,18 @@
                                         </div>
 
                                         <dl class="record__facts">
-                                            <div class="fact<%= hasBorn ? '' : ' fact--muted' %>">
+                                            <div class="fact<%= bornDate ? '' : ' fact--muted' %>">
                                                 <dt>Born</dt>
-                                                <dd><%= hasBorn ? record.birth_date : "Not recorded" %></dd>
+                                                <dd><%= bornDate || MISSING_TEXT %></dd>
                                             </div>
-                                            <div class="fact<%= hasDied ? '' : ' fact--muted' %>">
+                                            <div class="fact<%= diedDate ? '' : ' fact--muted' %>">
                                                 <dt>Died</dt>
-                                                <dd><%= hasDied ? record.death_date : "Not recorded" %></dd>
+                                                <dd><%= diedDate || MISSING_TEXT %></dd>
                                             </div>
-                                            <% if (hasAge) { %>
+                                            <% if (ageYears) { %>
                                                 <div class="fact">
                                                     <dt>Age</dt>
-                                                    <dd><%= record.age_sane %></dd>
+                                                    <dd><%= ageYears %></dd>
                                                 </div>
                                             <% } %>
                                             <% if (cemeteryName) { %>
@@ -311,6 +409,32 @@
                     active.forEach(function (item) {
                         var input = form.querySelector('[name="' + item.key + '"]');
                         if (input && !input.value) input.value = item.value;
+                    });
+                });
+
+                /* A field the visitor left empty must not become an empty key in
+                   the query string. With ?firstName=&lastName=&… present the
+                   server takes its filtered path, that path has no row limit, and
+                   one click on "Search records" with nothing typed returned 1000
+                   records (a ~3.4 MB page) under a count that was not a real
+                   total. A disabled control is left out of the submission, so an
+                   empty search now goes to the plain /search/<cemetery> the
+                   "Clear filters" link already uses, and every field that does
+                   have a value is submitted exactly as typed. */
+                document.querySelectorAll('[data-search-form]').forEach(function (form) {
+                    form.addEventListener('submit', function () {
+                        form.querySelectorAll('[name]').forEach(function (field) {
+                            if (String(field.value).trim() === '') field.disabled = true;
+                        });
+                    });
+                });
+
+                /* Fields are disabled only for the moment of submitting: if the
+                   visitor comes back to this page (browser cache), they work
+                   again. */
+                window.addEventListener('pageshow', function () {
+                    document.querySelectorAll('[data-search-form] [name]').forEach(function (field) {
+                        field.disabled = false;
                     });
                 });
 

@@ -10,6 +10,17 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
 //the lookup failing; the real Supabase error goes to the function log only.
 const DATABASE_UNAVAILABLE_MESSAGE = 'The record database is temporarily unavailable. Please try again shortly.';
 
+//Shown when the value typed into the lookup box is not a Memorial ID at all
+//("abc", "12 34"). A Memorial ID is a number, so anything else would be rejected
+//by the database and used to be reported as an outage — the wrong cause, and
+//advice that retrying could never fix. It is answered as bad input instead, and
+//the wording is deliberately nothing like the outage message.
+const INVALID_MEMORIAL_ID_MESSAGE = 'A Memorial ID is a number, for example 1001728. Please check the record ID shown on the card and try again.';
+
+//A Memorial ID is numeric; validating it decides whether the lookup runs at all
+//and changes nothing about how a real ID is queried.
+const MEMORIAL_ID_PATTERN = /^\d+$/;
+
 //Render the update page (lookup form plus a message) as an HTML response.
 async function renderUpdatePage(templateData) {
   const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
@@ -42,6 +53,14 @@ exports.handler = async function (event, context) {
       headers: { 'Content-Type': 'text/html' },
       body: html
     };
+  }
+
+  // A Memorial ID that is not a number cannot be looked up: the column is
+  // numeric and the database rejects the value. Say what is wrong with the
+  // input instead of reporting a database outage. No lookup is attempted, so
+  // this cannot be mistaken for — or caused by — the database being down.
+  if (!MEMORIAL_ID_PATTERN.test(String(memorial_id).trim())) {
+    return await renderUpdatePage({ record: null, message: INVALID_MEMORIAL_ID_MESSAGE });
   }
 
   // findCemetery throws when the database cannot be read at all. Answer with a
