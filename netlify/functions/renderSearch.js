@@ -5,6 +5,11 @@ const path = require("path");
 // Connect to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
 
+// A birth or death year has to look like a year (four digits — the search
+// form's own fields accept 1700-2050) before it is put in a query. Validating
+// it is not a query change: it only decides whether the query is built.
+const YEAR_PATTERN = /^\d{4}$/;
+
 exports.handler = async function (event, context) {
     // Extract cemetery from path
     const cemetery = event.path.split('/').pop();
@@ -13,11 +18,11 @@ exports.handler = async function (event, context) {
     // Validate cemetery
     const validCemeteries = ["bcmg", "capernaum", "honeyford"];
     if (!validCemeteries.includes(cemetery)) {
-        return {
-            statusCode: 404,
-            body: 'Cemetery not found',
-            headers: { "Content-Type": "text/plain" }
-        };
+        // A slug that is not a cemetery gets the site's own not-found page —
+        // the same header, footer and type as every other page, a link back to
+        // the search and the three real cemeteries — instead of an unstyled
+        // line of text. The status code stays an honest 404.
+        return renderCemeteryNotFoundPage(cemetery);
     }
         
     // Get cemetery title
@@ -28,6 +33,31 @@ exports.handler = async function (event, context) {
 
      // Initialize data as empty array
     let data = [];
+
+    const { lastName, firstName, maidenName, birthYear, deathYear } = event.queryStringParameters || {};
+
+    // A birth or death year has to be a year before it is sent to the database.
+    // The birth_year / death_year columns are numeric, so a hand-typed "abc"
+    // made the database reject the query and the visitor was told "the record
+    // database is temporarily unavailable" — the wrong cause, and advice
+    // ("try again shortly") that could never help. The query is not built at
+    // all in that case; the page says what is wrong with the input instead.
+    // Nothing about a valid query changes: the same columns, the same filters
+    // and the same limit as before.
+    const invalidYears = [];
+    if (birthYear && !YEAR_PATTERN.test(birthYear)) invalidYears.push("birth year");
+    if (deathYear && !YEAR_PATTERN.test(deathYear)) invalidYears.push("death year");
+    if (invalidYears.length > 0) {
+        return renderSearchPage({
+            cemetery,
+            title,
+            records: [],
+            hasSearchParams,
+            searched: hasSearchParams,
+            invalidYears,
+            databaseUnavailable: false
+        });
+    }
 
     // Build the query
     let query = supabase
@@ -53,8 +83,6 @@ exports.handler = async function (event, context) {
         .order('last_name', { ascending: true });
 
     if (hasSearchParams) {
-        const { lastName, firstName, maidenName, birthYear, deathYear } = event.queryStringParameters;
-
         // Add optional elements to the query
         if (lastName) query = query.ilike('last_name', `%${lastName}%`);
         if (firstName) query = query.ilike('first_name', `%${firstName}%`);
@@ -120,6 +148,31 @@ async function renderSearchPage(locals) {
         return {
             statusCode: 500,
             body: "Internal Server Error",
+        };
+    }
+}
+
+// Render the "no such cemetery" page in the site's own design. It is a real
+// page (header, footer, the three cemeteries, a way back to the search) rather
+// than the bare line of text this path used to answer with, and the response
+// keeps the honest 404 status. If the template cannot be rendered the plain
+// line is still better than a stack trace.
+async function renderCemeteryNotFoundPage(requestedSlug) {
+    try {
+        const templatePath = path.resolve(__dirname, "../../public/views/cemetery-not-found.ejs");
+        const html = await ejs.renderFile(templatePath, { requestedSlug });
+
+        return {
+            statusCode: 404,
+            headers: { "Content-Type": "text/html" },
+            body: html,
+        };
+    } catch (error) {
+        console.error("Error rendering cemetery-not-found.ejs:", error);
+        return {
+            statusCode: 404,
+            headers: { "Content-Type": "text/plain" },
+            body: "Cemetery not found",
         };
     }
 }

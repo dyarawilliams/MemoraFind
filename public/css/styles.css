@@ -1239,6 +1239,14 @@ legend {
     margin-top: var(--sp-5);
 }
 
+/* An address fragment the visitor typed, echoed back on the "cemetery not
+   found" page. It can be arbitrarily long, so it must never push the page
+   wider than the viewport. */
+.address-echo {
+    overflow-wrap: anywhere;
+    font-weight: 650;
+}
+
 /* --------------------------------------------------------------------------
    Landing page extras: trust strip / how it works
    -------------------------------------------------------------------------- */

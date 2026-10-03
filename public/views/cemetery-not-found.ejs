@@ -1,0 +1,69 @@
+<%
+  /* Shown by netlify/functions/renderSearch.js when the cemetery slug in the
+     path is not one of the three cemeteries the site reads (e.g. /search/Bamberg).
+     It is a real page in the site's own design — same header, footer and type as
+     every other page — with a link back to the search and to each cemetery, and
+     the response keeps the honest 404 status. */
+  var requestedSlug = (typeof locals.requestedSlug === "string") ? locals.requestedSlug : "";
+
+  var cemeteries = [
+    { code: "bcmg", name: "Bamberg County Memory Gardens", short: "Memory Gardens" },
+    { code: "capernaum", name: "Capernaum Cemetery", short: "Capernaum" },
+    { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
+  ];
+%>
+<%- include('partials/header.ejs', { pageTitle: 'Cemetery not found — MemoraFind' }) %>
+
+        <div class="page">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/#cemeteries">Cemeteries</a></li>
+                        <li aria-current="page">Cemetery not found</li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1>Cemetery not found</h1>
+                    <p>
+                        MemoraFind searches the burial records of the three cemeteries below.
+                        This address does not belong to one of them.
+                    </p>
+                </div>
+
+                <div class="empty-state" role="status">
+                    <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M11 21.5l10-6M11 15.5l10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <h3>There is no cemetery at this address</h3>
+                    <% if (requestedSlug) { %>
+                        <p>
+                            We could not match
+                            <code class="address-echo"><%= requestedSlug %></code>
+                            to a cemetery. Nothing is wrong with the records themselves &mdash;
+                            only the address.
+                        </p>
+                    <% } else { %>
+                        <p>
+                            We could not match this address to a cemetery. Nothing is wrong
+                            with the records themselves &mdash; only the address.
+                        </p>
+                    <% } %>
+                    <ul>
+                        <li>Cemetery names are shortened in the address: <code>/search/bcmg</code>, <code>/search/capernaum</code>, <code>/search/honeyford</code>.</li>
+                        <li>Start from the search form on the home page and pick a cemetery there.</li>
+                        <li>Searching is free and needs no account.</li>
+                    </ul>
+                    <div class="empty-state__actions">
+                        <a class="btn btn--primary" href="/#search">Search the records</a>
+                        <% cemeteries.forEach(function (cemetery) { %>
+                            <a class="btn btn--ghost" href="/search/<%= cemetery.code %>"><%= cemetery.short %></a>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs') %>
