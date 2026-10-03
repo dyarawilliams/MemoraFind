@@ -1,0 +1,80 @@
+<%
+  /* ------------------------------------------------------------------------
+     Shown by netlify/functions/renderGrave.js when /grave/<record ID> cannot
+     be matched to a record: the address is not a record ID at all ("abc", an
+     empty segment after /grave/), or it is a number no cemetery here holds.
+
+     It is a real page in the site's own design — same header, footer and type
+     as every other page, with a way back to the search — and the response
+     keeps the honest 404 status. The two cases are worded differently,
+     because "that is not a record ID" and "we have no such record" are
+     different things to tell someone.
+
+     Locals: requestedId (what was asked for, shown escaped), malformed (true
+     when it is not a record ID at all). */
+  var requestedId = (typeof locals.requestedId === "string") ? locals.requestedId : "";
+  var isMalformed = !!locals.malformed;
+  var pageTitle = (isMalformed ? "That is not a record ID" : "Record not found") + " — MemoraFind";
+
+  var cemeteries = [
+    { code: "bcmg", name: "Bamberg County Memory Gardens", short: "Memory Gardens" },
+    { code: "capernaum", name: "Capernaum Cemetery", short: "Capernaum" },
+    { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
+  ];
+%>
+<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/#search">Search records</a></li>
+                        <li aria-current="page"><%= isMalformed ? "Not a record ID" : "Record not found" %></li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1><%= isMalformed ? "That is not a record ID" : "Record not found" %></h1>
+                    <p>
+                        <%= isMalformed
+                            ? "A record ID is a number, for example 1001728. This address does not end in one."
+                            : "No record in the cemeteries MemoraFind searches carries this record ID." %>
+                    </p>
+                </div>
+
+                <div class="empty-state" role="status">
+                    <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M11 21.5l10-6M11 15.5l10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <h3><%= isMalformed ? "A record address ends in its record ID" : "There is no record at this address" %></h3>
+                    <% if (requestedId) { %>
+                        <p>
+                            We could not match
+                            <code class="address-echo"><%= requestedId %></code>
+                            to a record. Nothing is wrong with the records themselves &mdash;
+                            only the address.
+                        </p>
+                    <% } else { %>
+                        <p>
+                            This address has no record ID after it. Nothing is wrong with the
+                            records themselves &mdash; only the address.
+                        </p>
+                    <% } %>
+                    <ul>
+                        <li>Each search result shows its record ID; the address of that person's page is <code>/grave/</code> followed by that number.</li>
+                        <li>If you have the ID, check the digits &mdash; a mistyped number will not match any record.</li>
+                        <li>If you do not have the ID, search by name and open the result you want.</li>
+                    </ul>
+                    <div class="empty-state__actions">
+                        <a class="btn btn--primary" href="/#search">Search the records</a>
+                        <% cemeteries.forEach(function (cemetery) { %>
+                            <a class="btn btn--ghost" href="/search/<%= cemetery.code %>"><%= cemetery.short %></a>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs') %>

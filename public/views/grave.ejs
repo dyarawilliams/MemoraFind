@@ -1,0 +1,192 @@
+<%
+  /* ------------------------------------------------------------------------
+     One person's record, at an address of its own: /grave/<record ID>.
+     Rendered by netlify/functions/renderGrave.js.
+
+     Locals:
+       record        one row from <cemetery>_data_formatted_2 — the same
+                     columns the search cards read
+       cemeteryName  display name of the cemetery the row belongs to
+       cemeteryCode  "bcmg" | "capernaum" | "honeyford", the slug the
+                     cemetery's search page is built from
+
+     Every line here is a field of that row or a link to a page that already
+     exists. Nothing is promised about where the grave is: the source data
+     carries no section or lot for almost every record, so the page says so in
+     the same words as the search card
+     (partials/fact-burial-location.ejs) and no further.
+
+     The name is written the way the search card writes it — "Last, First
+     Middle Suffix", with the prefix and the Veteran flag as badges — so the
+     page and the result card can be compared word for word. The Age row is
+     shown only when the record has a usable age, and the Veteran badge only
+     when the record is flagged as one, both exactly as the card does. */
+  var display = {};
+  include('partials/record-display.ejs', { display: display });
+
+  var record = (typeof locals.record === "object" && locals.record) ? locals.record : {};
+  var cemeteryName = (typeof locals.cemeteryName === "string") ? locals.cemeteryName : "";
+  var cemeteryCode = (typeof locals.cemeteryCode === "string") ? locals.cemeteryCode : "";
+  var memorialId = (record.memorial_id === null || record.memorial_id === undefined) ? "" : String(record.memorial_id);
+
+  function recordedText(value) {
+      return (value === null || value === undefined) ? "" : String(value).trim();
+  }
+
+  var surname = recordedText(record.last_name);
+  var givenNames = [record.first_name, record.middle_name]
+      .filter(function (part) { return recordedText(part) !== ""; })
+      .join(" ");
+  var suffix = recordedText(record.suffix);
+  var prefix = recordedText(record.prefix);
+  var maidenName = recordedText(record.maiden_name);
+
+  var nameText = [
+      surname + ((surname && (givenNames || suffix)) ? "," : ""),
+      givenNames,
+      suffix
+  ].filter(function (part) { return part !== ""; }).join(" ");
+
+  var bornDate = display.formatRecordedDate(record.birth_date);
+  var diedDate = display.formatRecordedDate(record.death_date);
+  var ageYears = display.formatRecordedAge(record.age_sane);
+  var bornYear = display.recordedYear(record.birth_date);
+  var diedYear = display.recordedYear(record.death_date);
+  var isVet = record.is_vet == "Y";
+  var extraParts = ["notes", "moved_from", "moved_to"].filter(function (field) {
+      return recordedText(record[field]) !== "";
+  });
+
+  /* A title and a description that make sense when the address is pasted into
+     a message: the name, the years the record actually carries, and the
+     cemetery. A year the view wrote as a zero placeholder is left out rather
+     than printed (see partials/record-display.ejs). No location is claimed. */
+  var yearsText = "";
+  if (bornYear && diedYear) yearsText = bornYear + "–" + diedYear;
+  else if (bornYear) yearsText = "b. " + bornYear;
+  else if (diedYear) yearsText = "d. " + diedYear;
+
+  var pageTitle = nameText
+      + (yearsText ? " (" + yearsText + ")" : "")
+      + (cemeteryName ? " — " + cemeteryName : "")
+      + " — MemoraFind";
+
+  var lifeText = [];
+  if (bornDate) lifeText.push("born " + bornDate);
+  if (diedDate) lifeText.push("died " + diedDate);
+  var pageDescription = [nameText, lifeText.join(", "), cemeteryName]
+      .filter(function (part) { return part !== ""; }).join(" — ")
+      + ". Record ID " + memorialId + ". Burial records for Bamberg County, South Carolina.";
+%>
+<%- include('partials/header.ejs', { pageTitle: pageTitle, pageDescription: pageDescription }) %>
+
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <% if (cemeteryName && cemeteryCode) { %>
+                            <li><a href="/search/<%= cemeteryCode %>"><%= cemeteryName %></a></li>
+                        <% } %>
+                        <li aria-current="page"><%= nameText %></li>
+                    </ol>
+                </nav>
+
+                <article class="record">
+                    <div class="record__head">
+                        <h1 class="record__name record__name--page">
+                            <span class="record__surname"><%= surname %></span><% if (givenNames || suffix) { %>,<% } %>
+                            <% if (givenNames) { %> <span class="record__given"><%= givenNames %></span><% } %>
+                            <% if (suffix) { %> <span class="record__given"><%= suffix %></span><% } %>
+                        </h1>
+                        <% if (maidenName) { %>
+                            <p class="record__maiden">née <%= maidenName %></p>
+                        <% } %>
+                        <ul class="record__badges">
+                            <li>
+                                <span class="badge badge--id">
+                                    <span class="badge__key">Record ID</span>
+                                    <strong><%= memorialId %></strong>
+                                </span>
+                            </li>
+                            <% if (prefix) { %>
+                                <li><span class="badge badge--neutral"><%= prefix %></span></li>
+                            <% } %>
+                            <% if (isVet) { %>
+                                <li><span class="badge badge--vet">Veteran</span></li>
+                            <% } %>
+                        </ul>
+                    </div>
+
+                    <dl class="record__facts">
+                        <div class="fact<%= bornDate ? '' : ' fact--muted' %>">
+                            <dt>Born</dt>
+                            <dd><%= bornDate || display.MISSING_TEXT %></dd>
+                        </div>
+                        <div class="fact<%= diedDate ? '' : ' fact--muted' %>">
+                            <dt>Died</dt>
+                            <dd><%= diedDate || display.MISSING_TEXT %></dd>
+                        </div>
+                        <% if (ageYears) { %>
+                            <div class="fact">
+                                <dt>Age</dt>
+                                <dd><%= ageYears %></dd>
+                            </div>
+                        <% } %>
+                        <% if (cemeteryName) { %>
+                            <div class="fact fact--wide">
+                                <dt>Cemetery</dt>
+                                <dd><%= cemeteryName %></dd>
+                            </div>
+                        <% } %>
+                        <%- include('partials/fact-burial-location.ejs', { record: record }) %>
+                    </dl>
+
+                    <% if (extraParts.length > 0) { %>
+                        <details class="record__extra">
+                            <summary>More details</summary>
+                            <dl class="record__facts">
+                                <% if (recordedText(record.notes) !== "") { %>
+                                    <div class="fact fact--wide">
+                                        <dt>Notes</dt>
+                                        <dd><p><%= record.notes %></p></dd>
+                                    </div>
+                                <% } %>
+                                <% if (recordedText(record.moved_from) !== "") { %>
+                                    <div class="fact fact--wide">
+                                        <dt>Moved from</dt>
+                                        <dd><%= record.moved_from %></dd>
+                                    </div>
+                                <% } %>
+                                <% if (recordedText(record.moved_to) !== "") { %>
+                                    <div class="fact fact--wide">
+                                        <dt>Moved to</dt>
+                                        <dd><%= record.moved_to %></dd>
+                                    </div>
+                                <% } %>
+                            </dl>
+                        </details>
+                    <% } %>
+                </article>
+
+                <nav class="page__toolbar" aria-label="Other records">
+                    <% if (cemeteryName && cemeteryCode) { %>
+                        <a class="btn btn--primary" href="/search/<%= cemeteryCode %>">Search <%= cemeteryName %></a>
+                    <% } %>
+                    <a class="btn btn--ghost" href="/#search">Search all three cemeteries</a>
+                </nav>
+
+                <div class="notice grave-note" role="note">
+                    <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                        <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                    </svg>
+                    <p>
+                        <strong>Need this record corrected?</strong> Note the record ID
+                        <strong><%= memorialId %></strong>, then contact a library administrator.
+                        This page only shows the record MemoraFind holds.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs') %>

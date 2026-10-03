@@ -9,9 +9,15 @@
       var _pageTitle = (typeof pageTitle !== "undefined" && pageTitle)
           ? pageTitle
           : "MemoraFind — Bamberg County cemetery records";
+      /* pageDescription is optional. Only the single-record page passes one, so
+         that a pasted link describes that person; every other page keeps the
+         site's own description. */
+      var _pageDescription = (typeof pageDescription !== "undefined" && pageDescription)
+          ? pageDescription
+          : "MemoraFind is a free grave-finder for Bamberg County, South Carolina: search burial records from Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery by name, maiden name, birth or death year.";
     %>
     <title><%= _pageTitle %></title>
-    <meta name="description" content="MemoraFind is a free grave-finder for Bamberg County, South Carolina: search burial records from Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery by name, maiden name, birth or death year." />
+    <meta name="description" content="<%= _pageDescription %>" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235c0f12'/%3E%3Cpath d='M7 26V15a9 9 0 0 1 18 0v11' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 19h8M12 23h5' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/styles.css" />
