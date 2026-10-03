@@ -26,6 +26,20 @@
      number: the query is never run, so the page has to say the input is wrong
      rather than report a database problem. */
   var invalidYears = Array.isArray(locals.invalidYears) ? locals.invalidYears : [];
+  /* The database is asked for at most `resultLimit` rows (50), and in the same
+     request for the exact number of matching records (`totalMatches`). When
+     more records match than are shown, the count line states the real total and
+     says this is the first 50; when no total was reported the page says how many
+     records it is showing rather than printing a number it cannot support —
+     "1000 records found" was the database's own row cap reported as a total. */
+  var resultLimit = (typeof locals.resultLimit === "number" && locals.resultLimit > 0) ? locals.resultLimit : 50;
+  var reportedTotal = (typeof locals.totalMatches === "number" && locals.totalMatches >= 0) ? locals.totalMatches : null;
+  /* Only a search reports a matching total. Browsing is not a search, so the
+     browse page keeps its own wording ("50 records" plus the "first 50 records
+     in this cemetery" line) even though the exact cemetery total is known —
+     and a query string that filters nothing is a browse, so it reads the same. */
+  var totalKnown = (didSearch && reportedTotal !== null && reportedTotal > rows.length) ? reportedTotal : null;
+  var moreMayExist = didSearch && reportedTotal === null && rows.length >= resultLimit;
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
 
   /* Dates, age and the "Not recorded" wording come from
@@ -100,9 +114,23 @@
                         <% } else if (dbUnavailable) { %>
                             <p class="results__count">Records temporarily unavailable</p>
                         <% } else if (hasResults) { %>
+                            <% if (totalKnown !== null) { %>
+                                <% /* More records match than this page shows: the exact
+                                       total is stated, and so is the fact that only the
+                                       first `resultLimit` are on it. */ %>
+                                <p class="results__count">
+                                    <%= totalKnown %> records found &mdash; showing the first <%= rows.length %>
+                                </p>
+                            <% } else if (moreMayExist) { %>
+                                <% /* No total was reported, so no total is claimed. "At
+                                       least N" is the truth a capped result set can
+                                       support: N rows came back. */ %>
+                                <p class="results__count">At least <%= rows.length %> records match</p>
+                            <% } else { %>
                             <p class="results__count">
                                 <%= rows.length %> record<%= rows.length === 1 ? '' : 's' %><%= didSearch ? ' found' : '' %>
                             </p>
+                            <% } %>
                         <% } else if (didSearch) { %>
                             <% /* A search that matched nothing is a result, so it is
                                    counted like one: "0 records found" agrees with the
@@ -118,6 +146,16 @@
                         <p class="page__lede">
                             These are the first 50 records in this cemetery, listed by last name.
                             Use the search fields above to narrow the search.
+                        </p>
+                    <% } else if (totalKnown !== null) { %>
+                        <p class="page__lede">
+                            These are the first <%= rows.length %> of <%= totalKnown %> matching records,
+                            listed by last name. Narrow the search above to see the rest.
+                        </p>
+                    <% } else if (moreMayExist) { %>
+                        <p class="page__lede">
+                            Matching records are listed by last name. Narrow the search above to see
+                            fewer of them at once.
                         </p>
                     <% } %>
 
