@@ -1,0 +1,111 @@
+<%
+  /* ------------------------------------------------------------------------
+     Shared display rules for a record's dates, age and "not recorded"
+     wording. They are used by the search cards (public/views/search.ejs) and
+     by the single-record page (public/views/grave.ejs): both show the same
+     columns of the same <cemetery>_data_formatted_2 view, and a value has to
+     read identically on both, so the rules live here once.
+
+     How to use it — pass in a plain object to fill in:
+
+         var display = {};
+         include('partials/record-display.ejs', { display: display });
+         display.formatRecordedDate(record.birth_date)
+
+     The object is filled in place, so the caller can be an include with the
+     result discarded. Only display is affected: nothing about which columns
+     are read, or how they are queried, changes.
+
+     ------------------------------------------------------------------------
+     birth_date / death_date arrive from the view as a month/day/year string in
+     which a part that was never recorded is written as zero: "00/0/1967"
+     (year only), "03/0/1886" (month and year), "07/0", "02/14/0" and "00/0/0"
+     (nothing recorded). A zero is a placeholder, not a day, a month or a year,
+     so it must never be printed as one.
+
+     The parts that do exist are shown in the page's existing month/day/year
+     style, and a value with no usable part at all falls back to the same
+     "Not recorded" wording the cards already use.
+
+     A day is never shown without its month ("07/0" is not "07//"), and the
+     four-digit part is taken as the year wherever it sits in the string. */
+
+  var __display = (typeof locals !== "undefined" && locals && locals.display) ? locals.display : {};
+
+  var DATE_PART = /^\d+$/;
+  var MONTH_NAME = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*$/i;
+
+  /* The usable tokens of a recorded date, in the order they were recorded, or
+     null when the value carries no date we can show. */
+  function recordedDateTokens(raw) {
+      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
+      if (text === "") return null;
+
+      /* Numbers, month names and separators only — anything else (a stray
+         "Not recorded" stored in the column, say) is not a date we can show. */
+      var tokens = text.split(/[^0-9A-Za-z]+/).filter(function (part) { return part !== ""; });
+      if (tokens.length === 0) return null;
+      var usable = tokens.every(function (part) {
+          return DATE_PART.test(part) || MONTH_NAME.test(part);
+      });
+      if (!usable) return null;
+
+      /* Drop the zero placeholders. */
+      var parts = tokens.filter(function (part) { return !/^0+$/.test(part); });
+      return parts.length > 0 ? parts : null;
+  }
+
+  /* The parts of a recorded date, with the year separated out. */
+  function recordedDateParts(raw) {
+      var parts = recordedDateTokens(raw);
+      if (!parts) return null;
+
+      var year = null;
+      var rest = [];
+      parts.forEach(function (part) {
+          if (year === null && /^\d{4}$/.test(part)) { year = part; return; }
+          rest.push(part);
+      });
+
+      return {
+          month: rest.length > 0 ? rest[0] : null,
+          day: rest.length > 1 ? rest[1] : null,
+          year: year
+      };
+  }
+
+  function formatRecordedDate(raw) {
+      var parts = recordedDateParts(raw);
+      if (!parts) return null;
+
+      var shown = [];
+      if (parts.month) shown.push(parts.month);
+      /* A day on its own is not a date we can show, so it goes with the month. */
+      if (parts.day && parts.month) shown.push(parts.day);
+      if (parts.year) shown.push(parts.year);
+      return shown.length > 0 ? shown.join("/") : null;
+  }
+
+  /* Just the year a recorded date actually carries, or null when it carries
+     none ("07/0", "00/0/0"). Used for the compact year range in a single
+     record page's title and description, so a placeholder year is never
+     printed there either. */
+  function recordedYear(raw) {
+      var parts = recordedDateParts(raw);
+      return parts ? parts.year : null;
+  }
+
+  /* The view computes 0 for an age it could not work out (and for a death in
+     the same year as the birth). A 0 is never printed as an age. */
+  function formatRecordedAge(raw) {
+      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
+      if (!DATE_PART.test(text)) return null;
+      var years = parseInt(text, 10);
+      return years > 0 ? String(years) : null;
+  }
+
+  __display.formatRecordedDate = formatRecordedDate;
+  __display.recordedYear = recordedYear;
+  __display.formatRecordedAge = formatRecordedAge;
+  __display.MISSING_TEXT = "Not recorded";
+%>

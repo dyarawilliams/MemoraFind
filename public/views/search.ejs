@@ -28,69 +28,12 @@
   var invalidYears = Array.isArray(locals.invalidYears) ? locals.invalidYears : [];
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
 
-  /* ------------------------------------------------------------------------
-     Display-only date handling.
-
-     birth_date / death_date arrive from the <cemetery>_data_formatted_2 view
-     as a month/day/year string in which a part that was never recorded is
-     written as zero: "00/0/1967" (year only), "03/0/1886" (month and year),
-     "07/0", "02/14/0" and "00/0/0" (nothing recorded). A zero is a placeholder,
-     not a day, a month or a year, so it must never be printed as one.
-
-     Nothing here changes what is read or how it is queried: the value is
-     formatted for display, the parts that exist are shown in the page's
-     existing month/day/year style, and a value with no usable part at all
-     falls back to the same "Not recorded" wording the cards already use.
-     ---------------------------------------------------------------------- */
-  var DATE_PART = /^\d+$/;
-  var MONTH_NAME = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*$/i;
-
-  function formatRecordedDate(raw) {
-      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
-      if (text === "") return null;
-
-      /* Numbers, month names and separators only — anything else (a stray
-         "Not recorded" stored in the column, say) is not a date we can show. */
-      var tokens = text.split(/[^0-9A-Za-z]+/).filter(function (part) { return part !== ""; });
-      if (tokens.length === 0) return null;
-      var usable = tokens.every(function (part) {
-          return DATE_PART.test(part) || MONTH_NAME.test(part);
-      });
-      if (!usable) return null;
-
-      /* Drop the zero placeholders. */
-      var parts = tokens.filter(function (part) { return !/^0+$/.test(part); });
-      if (parts.length === 0) return null;
-
-      /* The four-digit part is the year wherever it sits; whatever is left
-         keeps its order, so month comes before day. */
-      var year = null;
-      var rest = [];
-      parts.forEach(function (part) {
-          if (year === null && /^\d{4}$/.test(part)) { year = part; return; }
-          rest.push(part);
-      });
-      var month = rest.length > 0 ? rest[0] : null;
-      var day = rest.length > 1 ? rest[1] : null;
-
-      var shown = [];
-      if (month) shown.push(month);
-      /* A day on its own is not a date we can show, so it goes with the month. */
-      if (day && month) shown.push(day);
-      if (year) shown.push(year);
-      return shown.length > 0 ? shown.join("/") : null;
-  }
-
-  /* The view computes 0 for an age it could not work out (and for a death in
-     the same year as the birth). A 0 is never printed as an age. */
-  function formatRecordedAge(raw) {
-      var text = (raw === null || raw === undefined) ? "" : String(raw).trim();
-      if (!DATE_PART.test(text)) return null;
-      var years = parseInt(text, 10);
-      return years > 0 ? String(years) : null;
-  }
-
-  var MISSING_TEXT = "Not recorded";
+  /* Dates, age and the "Not recorded" wording come from
+     partials/record-display.ejs — the same rules the single-record page
+     (grave.ejs) uses, so a person's dates read identically on the results card
+     and on their own page. See that file for the placeholder handling. */
+  var display = {};
+  include('partials/record-display.ejs', { display: display });
 
   /* The three cemeteries are the literals that renderSearch.js validates
      against, so the switcher can only offer real destinations. */
@@ -245,14 +188,12 @@
                                   var givenNames = [record.first_name, record.middle_name]
                                       .filter(function (part) { return part && String(part).trim() !== ""; })
                                       .join(" ");
-                                  var hasSection = record.section !== null && record.section !== undefined && String(record.section).trim() !== "";
-                                  var hasLot = record.lot !== null && record.lot !== undefined && String(record.lot).trim() !== "";
                                   /* Dates and age are formatted for display only: a zero part
                                      the view wrote as a placeholder is not shown as a real day,
-                                     month, year or age (see formatRecordedDate above). */
-                                  var bornDate = formatRecordedDate(record.birth_date);
-                                  var diedDate = formatRecordedDate(record.death_date);
-                                  var ageYears = formatRecordedAge(record.age_sane);
+                                     month, year or age (see partials/record-display.ejs). */
+                                  var bornDate = display.formatRecordedDate(record.birth_date);
+                                  var diedDate = display.formatRecordedDate(record.death_date);
+                                  var ageYears = display.formatRecordedAge(record.age_sane);
                                   var extraParts = ["notes", "moved_from", "moved_to"].filter(function (field) {
                                       return record[field] !== null && record[field] !== undefined && String(record[field]).trim() !== "";
                                   });
@@ -270,10 +211,13 @@
                                             <% } %>
                                             <ul class="record__badges">
                                                 <li>
-                                                    <span class="badge badge--id">
+                                                    <% /* The record ID is the address of this
+                                                          person's own page (/grave/<id>), so it is
+                                                          the link there. Same badge, same text. */ %>
+                                                    <a class="badge badge--id badge--id-link" href="/grave/<%= record.memorial_id %>">
                                                         <span class="badge__key">Record ID</span>
                                                         <strong><%= record.memorial_id %></strong>
-                                                    </span>
+                                                    </a>
                                                 </li>
                                                 <% if (record.prefix && String(record.prefix).trim() !== "") { %>
                                                     <li><span class="badge badge--neutral"><%= record.prefix %></span></li>
@@ -287,11 +231,11 @@
                                         <dl class="record__facts">
                                             <div class="fact<%= bornDate ? '' : ' fact--muted' %>">
                                                 <dt>Born</dt>
-                                                <dd><%= bornDate || MISSING_TEXT %></dd>
+                                                <dd><%= bornDate || display.MISSING_TEXT %></dd>
                                             </div>
                                             <div class="fact<%= diedDate ? '' : ' fact--muted' %>">
                                                 <dt>Died</dt>
-                                                <dd><%= diedDate || MISSING_TEXT %></dd>
+                                                <dd><%= diedDate || display.MISSING_TEXT %></dd>
                                             </div>
                                             <% if (ageYears) { %>
                                                 <div class="fact">
@@ -305,23 +249,7 @@
                                                     <dd><%= cemeteryName %></dd>
                                                 </div>
                                             <% } %>
-                                            <div class="fact fact--wide fact--place<%= (hasSection || hasLot) ? '' : ' fact--muted' %>">
-                                                <dt>Burial location</dt>
-                                                <dd>
-                                                    <% if (hasSection || hasLot) { %>
-                                                        <svg class="pin" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                                                            <path d="M10 1.5a6.5 6.5 0 0 0-6.5 6.5c0 4.6 6.5 10.5 6.5 10.5s6.5-5.9 6.5-10.5A6.5 6.5 0 0 0 10 1.5Zm0 9a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2Z" fill="currentColor" />
-                                                        </svg>
-                                                        <span>
-                                                            <% if (hasSection) { %>Section <%= record.section %><% } %>
-                                                            <% if (hasSection && hasLot) { %><span aria-hidden="true"> &middot; </span><% } %>
-                                                            <% if (hasLot) { %>Lot <%= record.lot %><% } %>
-                                                        </span>
-                                                    <% } else { %>
-                                                        Section and lot not recorded
-                                                    <% } %>
-                                                </dd>
-                                            </div>
+                                            <%- include('partials/fact-burial-location.ejs', { record: record }) %>
                                         </dl>
 
                                         <% if (extraParts.length > 0) { %>

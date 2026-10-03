@@ -1,0 +1,41 @@
+<%
+  /* The "Burial location" fact of a record card.
+
+     Shared by the search cards (public/views/search.ejs) and the single-record
+     page (public/views/grave.ejs) so the wording cannot drift between them.
+     The source data carries no section or lot for essentially every record, so
+     what the visitor is told about that has to be identical wherever it is
+     shown — and it is deliberately not a claim about where the grave is.
+
+     Call it inside a <dl class="record__facts"> with the record row, as an
+     unescaped include:
+
+         include('partials/fact-burial-location.ejs', { record: record })
+
+     (That is the partial's only call form — see the two views for the tag
+     around it; it is written without the delimiters here because a literal
+     opening tag inside this comment would close it.)
+
+     A section or lot is shown only when the record actually has one. The
+     fallback sentence is the site's existing one, unchanged. */
+  var __locationRecord = (typeof locals !== "undefined" && locals && locals.record) ? locals.record : {};
+  var hasSection = __locationRecord.section !== null && __locationRecord.section !== undefined && String(__locationRecord.section).trim() !== "";
+  var hasLot = __locationRecord.lot !== null && __locationRecord.lot !== undefined && String(__locationRecord.lot).trim() !== "";
+%>
+<div class="fact fact--wide fact--place<%= (hasSection || hasLot) ? '' : ' fact--muted' %>">
+    <dt>Burial location</dt>
+    <dd>
+        <% if (hasSection || hasLot) { %>
+            <svg class="pin" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M10 1.5a6.5 6.5 0 0 0-6.5 6.5c0 4.6 6.5 10.5 6.5 10.5s6.5-5.9 6.5-10.5A6.5 6.5 0 0 0 10 1.5Zm0 9a2.6 2.6 0 1 1 0-5.2 2.6 2.6 0 0 1 0 5.2Z" fill="currentColor" />
+            </svg>
+            <span>
+                <% if (hasSection) { %>Section <%= __locationRecord.section %><% } %>
+                <% if (hasSection && hasLot) { %><span aria-hidden="true"> &middot; </span><% } %>
+                <% if (hasLot) { %>Lot <%= __locationRecord.lot %><% } %>
+            </span>
+        <% } else { %>
+            Section and lot not recorded
+        <% } %>
+    </dd>
+</div>

@@ -1,0 +1,67 @@
+<%
+  /* ------------------------------------------------------------------------
+     Shown by netlify/functions/renderGrave.js when the record database could
+     not be read at all. The status is 503, not 404: nothing is known about
+     whether a record with this ID exists, so the page must not say that it
+     does not. The real Supabase error stays in the function log, never in the
+     page.
+
+     Locals: requestedId — the ID that was asked about, so "try again" can
+     point back at the same address. */
+  var requestedId = (typeof locals.requestedId === "string") ? locals.requestedId : "";
+  var pageTitle = "This record could not be read — MemoraFind";
+%>
+<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li><a href="/#search">Search records</a></li>
+                        <li aria-current="page">Record temporarily unavailable</li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1>This record could not be read</h1>
+                    <p>
+                        The record database is temporarily unavailable. Please try again
+                        shortly.
+                    </p>
+                </div>
+
+                <div class="empty-state" role="status">
+                    <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M11 19.5h10M11 24h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <h3>We could not look this record up just now</h3>
+                    <% if (requestedId) { %>
+                        <p>
+                            Record
+                            <code class="address-echo"><%= requestedId %></code>
+                            could not be read. This says nothing about whether the record
+                            exists &mdash; only that we could not reach it.
+                        </p>
+                    <% } else { %>
+                        <p>
+                            This record could not be read. This says nothing about whether it
+                            exists &mdash; only that we could not reach it.
+                        </p>
+                    <% } %>
+                    <ul>
+                        <li>Try the same address again in a minute.</li>
+                        <li>Searching by name is a way round it if this lasts.</li>
+                    </ul>
+                    <div class="empty-state__actions">
+                        <% if (requestedId) { %>
+                            <a class="btn btn--primary" href="/grave/<%= requestedId %>">Try this record again</a>
+                        <% } %>
+                        <a class="btn btn--ghost" href="/#search">Search the records</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs') %>

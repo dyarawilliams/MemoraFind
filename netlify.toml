@@ -11,6 +11,14 @@
   from = "/search/update"
   to = "/.netlify/functions/getUpdateRecord"
   status = 200
+# One person's record page: /grave/<record ID>. It uses its own /grave/ prefix
+# because the /search/:cemetery rule below is force = true and would swallow
+# any /search/... address. The splat also matches /grave/ itself, so an address
+# with no record ID reaches the function and gets its own 404 page.
+[[redirects]]
+  from = "/grave/*"
+  to = "/.netlify/functions/renderGrave"
+  status = 200
 
 [[redirects]]
   from = "/search/:cemetery"

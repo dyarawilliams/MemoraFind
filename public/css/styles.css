@@ -1141,6 +1141,37 @@ legend {
 }
 
 /* --------------------------------------------------------------------------
+   Single-record page (/grave/<record ID>) — the same card, one per page
+   -------------------------------------------------------------------------- */
+
+/* The record ID badge doubles as the link to that person's own page. It keeps
+   the gold fill and near-black text of every other record ID badge and only
+   gains an underline, drawn in the badge's own ink: a gold underline would
+   disappear into the gold fill. Hover/focus deepens the ink (8.3:1 on gold). */
+a.badge--id-link {
+    text-decoration-line: underline;
+    text-decoration-color: var(--ink);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+a.badge--id-link:hover,
+a.badge--id-link:focus-visible {
+    text-decoration-color: var(--burgundy-deep);
+}
+
+/* The person's name is the heading of the page, written exactly the way the
+   search card writes it, at the h1 size. */
+.record__name--page {
+    font-size: var(--fs-2xl);
+}
+
+/* Breathing room between the record and the correction note below it. */
+.grave-note {
+    margin-top: var(--sp-5);
+}
+
+/* --------------------------------------------------------------------------
    Notices & empty states
    -------------------------------------------------------------------------- */
 
