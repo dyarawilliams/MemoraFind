@@ -1,0 +1,10 @@
+# MemoraFind — https://memorafind.netlify.app
+# The public pages (/, /search/bcmg, /search/capernaum, /search/honeyford)
+# are open to normal crawling. The function endpoints under /.netlify/ are
+# internal to the site and are not meant to be crawled, so they are disallowed.
+
+User-agent: *
+Allow: /
+Disallow: /.netlify/
+
+Sitemap: https://memorafind.netlify.app/sitemap.xml
