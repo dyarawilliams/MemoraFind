@@ -15,7 +15,13 @@
   var didSearch = (typeof locals.hasSearchParams !== "undefined")
       ? !!locals.hasSearchParams
       : rows.length > 0;
-  var hasResults = didSearch && rows.length > 0;
+  /* renderSearch.js sets this when the database could not be read at all, so the
+     page can say "we could not look" instead of "we found nothing". */
+  var dbUnavailable = !!locals.databaseUnavailable;
+  /* No filters and rows to show: the visitor is browsing the cemetery, and
+     renderSearch.js has already asked for only its first 50 records. */
+  var isBrowse = !didSearch && rows.length > 0;
+  var hasResults = rows.length > 0;
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
 
   /* The three cemeteries are the literals that renderSearch.js validates
@@ -78,14 +84,23 @@
                 <section class="results" aria-labelledby="results-title">
                     <div class="results__head">
                         <h2 id="results-title">Search results</h2>
-                        <% if (hasResults) { %>
+                        <% if (dbUnavailable) { %>
+                            <p class="results__count">Records temporarily unavailable</p>
+                        <% } else if (hasResults) { %>
                             <p class="results__count">
-                                <%= rows.length %> record<%= rows.length === 1 ? '' : 's' %> found
+                                <%= rows.length %> record<%= rows.length === 1 ? '' : 's' %><%= didSearch ? ' found' : '' %>
                             </p>
                         <% } else { %>
                             <p class="results__count">No search yet</p>
                         <% } %>
                     </div>
+
+                    <% if (isBrowse) { %>
+                        <p class="page__lede">
+                            These are the first 50 records in this cemetery, listed by last name.
+                            Use the search fields above to narrow the search.
+                        </p>
+                    <% } %>
 
                     <div class="filter-summary" data-filter-summary hidden></div>
 
@@ -100,7 +115,18 @@
                         </p>
                     </div>
 
-                    <% if (!didSearch) { %>
+                    <% if (dbUnavailable) { %>
+                        <div class="empty-state" role="status">
+                            <svg class="empty-state__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                            </svg>
+                            <h3>The record database is temporarily unavailable</h3>
+                            <p>
+                                We could not read the records just now, so this says nothing about
+                                who is or is not buried here. Please try again shortly.
+                            </p>
+                        </div>
+                    <% } else if (!didSearch && !isBrowse) { %>
                         <div class="empty-state">
                             <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
                                 <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />

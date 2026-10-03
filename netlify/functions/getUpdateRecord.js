@@ -6,10 +6,26 @@ const { findCemetery } = require('./findCemetery');
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
 
+//Shown whenever the database cannot be read. The visitor is told the truth about
+//the lookup failing; the real Supabase error goes to the function log only.
+const DATABASE_UNAVAILABLE_MESSAGE = 'The record database is temporarily unavailable. Please try again shortly.';
+
+//Render the update page (lookup form plus a message) as an HTML response.
+async function renderUpdatePage(templateData) {
+  const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
+  const html = await ejs.renderFile(templatePath, templateData);
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'text/html' },
+    body: html
+  };
+}
+
 //export function
 exports.handler = async function (event, context) {
 
-  const memorial_id = event.queryStringParameters.memorial_id;
+  const memorial_id = (event.queryStringParameters || {}).memorial_id;
 
   // Handle the user clicking "Search" without entering a value in the box
   // If the user clicks "Search" without entering a value, return a message
@@ -28,7 +44,16 @@ exports.handler = async function (event, context) {
     };
   }
 
-  const cemetery = await findCemetery(memorial_id);
+  // findCemetery throws when the database cannot be read at all. Answer with a
+  // plain message instead of letting the throw reach the visitor as a 502 whose
+  // body carries a stack trace and internal file paths.
+  let cemetery;
+  try {
+    cemetery = await findCemetery(memorial_id);
+  } catch (error) {
+    console.error('Database error while finding the cemetery for memorial ID', memorial_id, ':', error);
+    return await renderUpdatePage({ record: null, message: DATABASE_UNAVAILABLE_MESSAGE });
+  }
 
   // If the cemetery variable is still null after checking all views,
   // it means the memorial_id was not found in any cemetery
@@ -90,13 +115,15 @@ exports.handler = async function (event, context) {
     }
 
   } catch (error) {
-    if (error) {
-      console.error('Database query error:', error);
-      throw new Error('An error occurred while searching for the record.');
-    }
-    return {
-      statusCode: 500,
-      body: 'Internal Server Error'
-    };
+    // The record could not be read (or the query itself failed). Say so plainly
+    // and keep the real error, with its code, in the function log.
+    console.error('Database query error:', error);
+    console.error('Supabase error details:', {
+      code: error && error.code,
+      message: error && error.message,
+      details: error && error.details,
+      hint: error && error.hint
+    });
+    return await renderUpdatePage({ record: null, message: DATABASE_UNAVAILABLE_MESSAGE });
   }
 };
