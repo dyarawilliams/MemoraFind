@@ -17,8 +17,9 @@ exports.handler = async function (event, context) {
   const { username, password } = querystring.parse(event.body);
 
   //Use Supabase's built-in authentication to log in and permit write access to the DB. Also provides a token to use later.
+  // This is the single Supabase account the site signs in as; the address is deliberately in the code.
   let { data, error } = await supabase.auth.signInWithPassword({
-    email: 'dyara.williams@outlook.com',
+    email: 'memorafind@gmail.com',
     password: password,
   });
 
