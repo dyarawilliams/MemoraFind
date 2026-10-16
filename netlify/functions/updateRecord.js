@@ -7,6 +7,51 @@ const cookie = require('cookie');
 const querystring = require('querystring');
 const { findCemetery } = require('./findCemetery');
 
+//Columns the database holds as numbers. PostgREST hands them back as numbers
+//while an HTML form always posts strings, so they have to be compared as
+//numbers — compared as strings "1907" never equals 1907 and every submit looked
+//like a change to the dates.
+const NUMERIC_COLUMNS = ['birth_year', 'birth_day', 'death_year', 'death_day'];
+
+//An empty form field and an empty column mean the same thing.
+function isEmptyValue(value) {
+  return value === null || value === undefined || value === '';
+}
+
+//True when the submitted value genuinely differs from the stored one.
+function valueChanged(key, submitted, stored) {
+  if (NUMERIC_COLUMNS.indexOf(key) !== -1) {
+    if (isEmptyValue(submitted) || isEmptyValue(stored)) {
+      return isEmptyValue(submitted) !== isEmptyValue(stored);
+    }
+
+    const submittedNumber = Number(submitted);
+    const storedNumber = Number(stored);
+
+    //Anything that is not a number on both sides falls through and is compared
+    //as it stands, so a bad value is still treated as a change.
+    if (!isNaN(submittedNumber) && !isNaN(storedNumber)) {
+      return submittedNumber !== storedNumber;
+    }
+  }
+
+  if (isEmptyValue(submitted) && isEmptyValue(stored)) {
+    return false;
+  }
+
+  return String(submitted) !== String(stored);
+}
+
+//Thrown when the database accepts a write but changes no row. It is a different
+//failure from a rejected query, and it is reported to the volunteer in words of
+//its own instead of being passed off as a save.
+class NothingSavedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'NothingSavedError';
+  }
+}
+
 
 async function updateRecordInSupabase(supabase, formData) {
   try {
@@ -63,7 +108,7 @@ async function updateRecordInSupabase(supabase, formData) {
       currentData[key] = currentData[key] === null ? "" : currentData[key];
 
       // Check if the field exists in formData and has changed
-      if (formData[key] !== undefined && formData[key] !== currentData[key]) {
+      if (formData[key] !== undefined && valueChanged(key, formData[key], currentData[key])) {
         // Add to update payload only if the value has changed
         if (formData[key] === '' && currentData[key] === "") {
           updatePayload[key] = null; // Keep it as null if both are effectively empty
@@ -74,21 +119,32 @@ async function updateRecordInSupabase(supabase, formData) {
     }
     // console.log('Update payload:', updatePayload);
     if (Object.keys(updatePayload).length === 0) {
-      return { message: 'No fields were changed', data: currentData };
+      //Nothing differed from what is stored, so nothing is written and no save
+      //is reported either. The handler answers on `fieldsChanged`.
+      return { fieldsChanged: false, data: currentData };
     }
 
-    // Perform the update with the constructed payload
-    const { data, error: updateError } = await supabase
+    // Perform the update with the constructed payload, and ask for the rows the
+    // database actually changed. Without .select() the answer carries no rows at
+    // all, so a write that no policy permits — Supabase reports that as no error
+    // and zero rows — could not be told apart from a real save.
+    const { data: updatedRows, error: updateError } = await supabase
       .from(tableName)
       .update(updatePayload)
-      .eq('memorial_id', memorial_id);
+      .eq('memorial_id', memorial_id)
+      .select('memorial_id');
 
     if (updateError) {
       console.error('Error updating record:', updateError);
       throw new Error('Failed to update the record. Please try again.');
     }
 
-    return data;
+    // Zero rows changed: the request was accepted, nothing was stored.
+    if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
+      throw new NothingSavedError(`The database accepted the update for memorial ID ${memorial_id} in ${tableName} but changed no rows.`);
+    }
+
+    return { fieldsChanged: true, data: updatedRows };
   } catch (error) {
     console.error('Error updating record in Supabase:', error);
     throw error;
@@ -126,10 +182,23 @@ exports.handler = async function (event, context) {
   try {
     memorial_id = formData.memorial_id;
     // Try to update the database (see function definition)
-    await updateRecordInSupabase(supabase, formData);
+    const result = await updateRecordInSupabase(supabase, formData);
+
+    const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
+
+    // The submit matched what is already stored, so no write was made: say that
+    // rather than reporting an update that never happened.
+    if (result && result.fieldsChanged === false) {
+      const html = await ejs.renderFile(templatePath, { record: null, message: 'No fields were changed, so the record was left as it is.'});
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'text/html' },
+        body: html
+      };
+    }
 
     // If it worked, show the memorial ID to the user
-    const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
     const html = await ejs.renderFile(templatePath, { record: null, message: `Record ${memorial_id} has been updated successfully.`});
 
     return {
@@ -142,6 +211,20 @@ exports.handler = async function (event, context) {
     // If it didn't work, show a error message to the user.
     console.error('Error updating record:', error);
     const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
+
+    // The database took the write but changed no row. Nothing was saved, and
+    // that is what the volunteer is told: this is the case that used to answer
+    // "has been updated successfully." with no error and zero rows written.
+    if (error && error.name === 'NothingSavedError') {
+      const html = await ejs.renderFile(templatePath, { record: null, message: 'Nothing was saved. The database did not change this record. Please check the record is still there, and tell a library administrator if this happens again.' });
+
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'text/html' },
+        body: html
+      };
+    }
+
     const html = await ejs.renderFile(templatePath, { record: null, message: 'Error Updating Record. Please try again.' });
 
     return {
