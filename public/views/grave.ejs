@@ -78,7 +78,7 @@
       .filter(function (part) { return part !== ""; }).join(" — ")
       + ". Record ID " + memorialId + ". Burial records for Bamberg County, South Carolina.";
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle, pageDescription: pageDescription }) %>
+<%- include('partials/header.ejs', { pageTitle: pageTitle, pageDescription: pageDescription, canonicalPath: (memorialId ? "/grave/" + memorialId : "/") }) %>
 
         <div class="page page--narrow">
             <div class="container">
