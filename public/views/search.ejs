@@ -57,7 +57,7 @@
     { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
   ];
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+<%- include('partials/header.ejs', { pageTitle: pageTitle, canonicalPath: (cemeteryCode ? "/search/" + cemeteryCode : "/") }) %>
 
         <div class="page">
             <div class="container">
