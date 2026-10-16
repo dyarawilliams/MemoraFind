@@ -6,7 +6,7 @@ MemoraFind is a free grave finder for Bamberg County, South Carolina. Families, 
 
 1. [About the Project](#about-the-project)
 1. [Project Status](#project-status)
-1. [The Redesigned Interface](#the-redesigned-interface)
+1. [Design](#design)
     1. [Design System](#design-system)
     1. [Colour and Contrast](#colour-and-contrast)
 1. [Stack and Project Layout](#stack-and-project-layout)
@@ -27,13 +27,13 @@ MemoraFind is a free grave finder for Bamberg County, South Carolina. Families, 
 
 ## About the Project
 
-<a href="https://memorafind.netlify.app" target="_blank"> Live Demo </a>
+<a href="https://memorafind.com" target="_blank"> Live Demo </a>
 <hr>
 
 MemoraFind is a community-focused web application dedicated to helping individuals locate and learn more about their loved ones buried in cemeteries across Bamberg County, South Carolina. It covers three cemeteries — Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery.
 
 🔍 Core Features:
-* **Search the burial records:** find a record by first name, middle name, maiden name, last name, birth year or death year. The name filters are partial matches; the year filters are exact. (Filtered searches currently fail on the live site — see [Known Issues and What Is Not Built Yet](#known-issues-and-what-is-not-built-yet).)
+* **Search the burial records:** find a record by first name, middle name, maiden name, last name, birth year or death year. The name filters are partial matches; the year filters are exact.
 * **Cemetery and burial location on every result:** each result is a card led by the name and dates, followed by the cemetery and the burial location — the section and lot — so a visit can be planned without guesswork. Where the record carries notes or a relocation note, the card shows them under "More details".
 * **Secure record updates:** a visitor can look a record up, but changing it requires the administrator password, so the data stays accurate and protected.
 
@@ -48,11 +48,11 @@ More features and enhancements are on the way — because every memory matters.
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/a232b03e-0cfb-48f2-ac44-0b4113546fe5/deploy-status)](https://app.netlify.com/sites/memorafind/deploys)
 
-The site is live and searchable. The redesigned interface described below is built on the `redesign/public-frontend` branch and is waiting on review before it is merged.
+The site is live and searchable at **https://memorafind.com**. The interface described under [Design](#design) below is the site's design: it is merged and deployed, not a branch waiting on review.
 
 **[Back to top](#table-of-contents)**
 
-## The Redesigned Interface
+## Design
 
 The look of the site is a small hand-written design system: two plain stylesheets, `public/css/tokens.css` (colour, type, spacing and focus tokens) and `public/css/styles.css` (the page and component styles), both linked from the shared header partial. There is no CSS framework and no CDN — nothing is fetched from a third party, no stylesheet is generated at build time, and the stylesheets are served as static files from `public/css/`. Headings are set in a serif stack and record data in a system sans-serif; no webfont is downloaded.
 
@@ -94,8 +94,6 @@ Pretty URLs are Netlify redirects in `netlify.toml`, all with `status = 200`, so
 | `/search/update` | `getUpdateRecord` | `public/views/update.ejs` | the administrator's lookup-and-edit page — see below |
 
 On `/search/:cemetery` the filters travel as query-string parameters: `lastName`, `firstName`, `maidenName`, `birthYear` and `deathYear`. The three name filters are partial, case-insensitive matches; the year filters are exact matches. Results are ordered by last name.
-
-**The `/search/update` route does not resolve today.** In `netlify.toml` the `/search/:cemetery` redirect is listed first and is `force = true`, so `/search/update` is read as the cemetery named `update`; that is not one of the three valid cemeteries, and the site answers `404 Cemetery not found`. The `/search/update` redirect to `getUpdateRecord` below it is never reached — which is also why the update page's "Start over" link leads to a 404.
 
 A function called `search.js` also exists in `netlify/functions/`, but no route in `netlify.toml` reaches it.
 
@@ -155,10 +153,7 @@ Deployment is done by Netlify from this repository. `netlify.toml` publishes `pu
 
 ## Known Issues and What Is Not Built Yet
 
-* **Filtered search returns an error.** On the live site a filtered search such as `/search/bcmg?lastName=smith` answers `500 Internal Server Error`. Browsing a cemetery unfiltered (`/search/bcmg`) works, so the fault is in how the filtered query is built rather than in the page. The fix belongs in a Supabase query under `netlify/functions/`, which this work deliberately leaves untouched.
-* **`/search/update` returns 404.** The administrator's update page cannot be reached at that address because of the redirect ordering described under [Routes](#routes). The page itself is still reachable through the "Update a record" links, which call the functions directly.
-* **There is no single-grave page.** No route, template or query renders one grave: a record appears only as a card in the search results. Giving one record a page of its own is a data-layer decision, not a styling one.
-* **Photos, biographies and family connections are not built.** No photograph, biography or family relationship is stored in or read from the data, and none of them appear in the interface. The nearest the site comes today is the free-text `notes` and the `moved_from` / `moved_to` relocation fields, which the search cards show under "More details".
+* **Photos, biographies and family connections are not built.** No photograph, biography or family relationship is stored in or read from the data, and none of them appear in the interface. The nearest the site comes today is the free-text `notes` and the `moved_from` / `moved_to` relocation fields, which a search card shows under "More details" when the record actually carries one.
 
 **[Back to top](#table-of-contents)**
 
@@ -182,7 +177,7 @@ No license file is present in this repository yet, so no license is granted by t
 
 ## Authors
 
-* **[D'yara Williams](https://github.com/dyarawilliams)** - *Initial work* - [MemoraFind](https://memorafind.netlify.app/)
+* **[D'yara Williams](https://github.com/dyarawilliams)** - *Initial work* - [MemoraFind](https://memorafind.com/)
 
 Also see the list of [contributors](https://github.com/dyarawilliams/MemoraFind/contributors) who participated in this project.
 
