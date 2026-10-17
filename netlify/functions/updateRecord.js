@@ -18,11 +18,23 @@ function isEmptyValue(value) {
   return value === null || value === undefined || value === '';
 }
 
+//The date columns are integers in the database, and the scraper stores 0 in one
+//of them when it has nothing to record: the live base table holds death_day 0
+//for a record whose edit form shows an empty day. No grave is dated in day 0,
+//month 0 or year 0, so in these four columns a 0 means "nothing recorded" in
+//exactly the same way as null, undefined or an empty field — this is what the
+//value means, not a numerical fudge. Compared any other way, an untouched form
+//(empty field, stored 0) counts as a change and every save submits a payload
+//that changes nothing.
+function isEmptyDateValue(value) {
+  return isEmptyValue(value) || value === 0 || value === '0';
+}
+
 //True when the submitted value genuinely differs from the stored one.
 function valueChanged(key, submitted, stored) {
   if (NUMERIC_COLUMNS.indexOf(key) !== -1) {
-    if (isEmptyValue(submitted) || isEmptyValue(stored)) {
-      return isEmptyValue(submitted) !== isEmptyValue(stored);
+    if (isEmptyDateValue(submitted) || isEmptyDateValue(stored)) {
+      return isEmptyDateValue(submitted) !== isEmptyDateValue(stored);
     }
 
     const submittedNumber = Number(submitted);
