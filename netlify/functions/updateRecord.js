@@ -19,15 +19,19 @@ function isEmptyValue(value) {
 }
 
 //The date columns are integers in the database, and the scraper stores 0 in one
-//of them when it has nothing to record: the live base table holds death_day 0
-//for a record whose edit form shows an empty day. No grave is dated in day 0,
-//month 0 or year 0, so in these four columns a 0 means "nothing recorded" in
-//exactly the same way as null, undefined or an empty field — this is what the
-//value means, not a numerical fudge. Compared any other way, an untouched form
-//(empty field, stored 0) counts as a change and every save submits a payload
-//that changes nothing.
+//of them when it has nothing to record: the live base table holds a zero in
+//death_day for a record whose edit form shows an empty day. No grave is dated
+//in day 0, month 0 or year 0, so in these four columns a zero means "nothing
+//recorded" in exactly the same way as null, undefined or an empty field — this
+//is what the value means, not a numerical fudge. Any zero the column can hand
+//back counts (0, '0', ' 0', '0.0'): PostgREST's 0 and the form's '' must land on
+//the same side of this test, or an untouched submit looks like a change and
+//every save sends a payload that changes nothing.
 function isEmptyDateValue(value) {
-  return isEmptyValue(value) || value === 0 || value === '0';
+  if (isEmptyValue(value)) {
+    return true;
+  }
+  return Number(value) === 0;
 }
 
 //True when the submitted value genuinely differs from the stored one.
