@@ -134,18 +134,34 @@
 
                             <fieldset>
                                 <legend>Dates</legend>
+                                <%-
+                                  /* The three birth fields are NOT required. A record
+                                     can legitimately hold no birth day (552 of 2,428 do),
+                                     no birth year, or no birth date at all, and since the
+                                     form shows the raw stored row those inputs are empty
+                                     exactly where the record holds nothing. Marking them
+                                     required made the browser refuse the submit, so a
+                                     volunteer correcting an unrelated field (a misspelled
+                                     surname) had to invent a birth date — which our rules
+                                     forbid. An empty input posts an empty string, which the
+                                     save path writes as "nothing recorded", not as 0.
+
+                                     min/max stay: a value that IS typed is still checked
+                                     against the same range as before. The death date fields
+                                     below were never required and are untouched. */
+                                %>
                                 <div class="form__pair">
                                     <div class="field">
                                         <label for="birth_year">Birth year</label>
-                                        <input type="number" id="birth_year" name="birth_year" value="<%= record.birth_year %>" min="1700" max="2026" required />
+                                        <input type="number" id="birth_year" name="birth_year" value="<%= record.birth_year %>" min="1700" max="2026" />
                                     </div>
                                     <div class="field">
                                         <label for="birth_month">Birth month</label>
-                                        <input type="text" id="birth_month" name="birth_month" value="<%= record.birth_month %>" required />
+                                        <input type="text" id="birth_month" name="birth_month" value="<%= record.birth_month %>" />
                                     </div>
                                     <div class="field">
                                         <label for="birth_day">Birth day</label>
-                                        <input type="number" id="birth_day" name="birth_day" value="<%= record.birth_day %>" min="1" max="31" required />
+                                        <input type="number" id="birth_day" name="birth_day" value="<%= record.birth_day %>" min="1" max="31" />
                                     </div>
                                     <div class="field">
                                         <label for="death_year">Death year</label>
