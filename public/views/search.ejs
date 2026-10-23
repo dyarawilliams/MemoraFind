@@ -4,8 +4,9 @@
 
        cemetery         "bcmg" | "capernaum" | "honeyford"   (renderSearch only)
        title            cemetery display name                (renderSearch only)
-       records          array of rows from <cemetery>_data_formatted_2
-       hasSearchParams  true when the request had a query string
+       records          array of rows from the cemetery's base table
+       hasSearchParams  true when the request carried a usable filter
+       awaitingSearch   true when it carried none at all      (renderSearch only)
 
      `locals.x` is used instead of a bare identifier so that the template also
      renders for netlify/functions/search.js, which passes records only. */
@@ -18,9 +19,14 @@
   /* renderSearch.js sets this when the database could not be read at all, so the
      page can say "we could not look" instead of "we found nothing". */
   var dbUnavailable = !!locals.databaseUnavailable;
-  /* No filters and rows to show: the visitor is browsing the cemetery, and
-     renderSearch.js has already asked for only its first 50 records. */
-  var isBrowse = !didSearch && rows.length > 0;
+  /* renderSearch.js sets this when the request carried no usable filter — no
+     query string at all, a blank or whitespace-only field, or an unknown
+     parameter on its own. The function answers without querying the database
+     in that case, so this page lists nothing: it shows the heading, the search
+     form, and one line saying what to type. It is not a result, so it carries
+     no count, no cards and no "no records found" claim, which would be a
+     statement about the cemetery that nobody has checked. */
+  var awaitingSearch = !!locals.awaitingSearch;
   var hasResults = rows.length > 0;
   /* renderSearch.js sets this when a hand-typed birth or death year is not a
      number: the query is never run, so the page has to say the input is wrong
@@ -34,10 +40,8 @@
      "1000 records found" was the database's own row cap reported as a total. */
   var resultLimit = (typeof locals.resultLimit === "number" && locals.resultLimit > 0) ? locals.resultLimit : 50;
   var reportedTotal = (typeof locals.totalMatches === "number" && locals.totalMatches >= 0) ? locals.totalMatches : null;
-  /* Only a search reports a matching total. Browsing is not a search, so the
-     browse page keeps its own wording ("50 records" plus the "first 50 records
-     in this cemetery" line) even though the exact cemetery total is known —
-     and a query string that filters nothing is a browse, so it reads the same. */
+  /* Only a search reports a matching total: a page with nothing typed lists no
+     records and states no number at all (see `awaitingSearch` above). */
   var totalKnown = (didSearch && reportedTotal !== null && reportedTotal > rows.length) ? reportedTotal : null;
   var moreMayExist = didSearch && reportedTotal === null && rows.length >= resultLimit;
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
@@ -93,7 +97,8 @@
                 <section class="panel panel--search" aria-labelledby="search-form-title">
                     <h2 id="search-form-title">Search <%= cemeteryName || "records" %></h2>
                     <p class="panel__intro">
-                        Enter as many values as you know. Leave fields blank to see all records.
+                        Enter as many values as you know &mdash; a last name, a maiden name, or a
+                        birth year is enough to start.
                     </p>
 
                     <form action="/search/<%= cemeteryCode %>" method="GET" id="search-form-2" class="form__grid" data-search-form>
@@ -106,6 +111,25 @@
                     </form>
                 </section>
 
+                <% if (awaitingSearch) { %>
+                    <% /* Nothing typed yet, so the page lists nothing. No count line, no
+                          cards and no "no records found": that last one would be a claim
+                          about the cemetery nobody has checked, and a list of the first
+                          50 would look like a complete answer to a question the visitor
+                          never asked. renderSearch.js answered without querying the
+                          database, so there is nothing here to show — only the heading
+                          and the form above, and this one line saying what to type. */ %>
+                    <div class="empty-state">
+                        <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                            <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            <path d="M11 19.5h10M11 24h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <p>
+                            Type a last name, a maiden name, or a birth year above to see the
+                            records held for <%= cemeteryName || "this cemetery" %>.
+                        </p>
+                    </div>
+                <% } else { %>
                 <section class="results" aria-labelledby="results-title">
                     <div class="results__head">
                         <h2 id="results-title">Search results</h2>
@@ -142,12 +166,7 @@
                         <% } %>
                     </div>
 
-                    <% if (isBrowse) { %>
-                        <p class="page__lede">
-                            These are the first 50 records in this cemetery, listed by last name.
-                            Use the search fields above to narrow the search.
-                        </p>
-                    <% } else if (totalKnown !== null) { %>
+                    <% if (totalKnown !== null) { %>
                         <p class="page__lede">
                             These are the first <%= rows.length %> of <%= totalKnown %> matching records,
                             listed by last name. Narrow the search above to see the rest.
@@ -188,7 +207,7 @@
                                 <li>The records themselves are fine &mdash; this is a message about what was typed.</li>
                             </ul>
                             <div class="empty-state__actions">
-                                <a class="btn btn--ghost" href="/search/<%= cemeteryCode %>">Clear the search and browse the records</a>
+                                <a class="btn btn--ghost" href="/search/<%= cemeteryCode %>">Clear the search</a>
                             </div>
                         </div>
                     <% } else if (dbUnavailable) { %>
@@ -202,7 +221,10 @@
                                 who is or is not buried here. Please try again shortly.
                             </p>
                         </div>
-                    <% } else if (!didSearch && !isBrowse) { %>
+                    <% } else if (!didSearch) { %>
+                        <% /* Only a caller that passes records without hasSearchParams can
+                              reach this (the legacy search.js); renderSearch.js answers a
+                              request with no usable filter above, before this section. */ %>
                         <div class="empty-state">
                             <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
                                 <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -344,6 +366,7 @@
                         </div>
                     <% } %>
                 </section>
+                <% } %>
             </div>
         </div>
 
