@@ -2,6 +2,12 @@ const { createClient } = require('@supabase/supabase-js');
 const ejs = require('ejs');
 const path = require('path');
 const { findCemetery } = require('./findCemetery');
+//The table a cemetery's data really lives in, and the way the base table's three
+//date columns become the one string the templates parse. Both live in
+//baseRecord.js because the search result cards (renderSearch.js) need exactly the
+//same two things — a card and the person's own page must not be able to disagree
+//about a date.
+const { baseTableFor, displayRecord } = require('./baseRecord');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -14,7 +20,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
  * /search/<cemetery>, and the record is then found through the existing
  * per-cemetery views — findCemetery.js resolves which of the three holds the
  * ID. The row itself is read from the BASE table behind that view (see
- * baseTableFor below), because the view does not carry the day of the month of
+ * baseRecord.js, which the search cards use too), because the view does not
+ * carry the day of the month of
  * a death date: 2,154 records hold one and the view shows a day on none of
  * them, which meant the page showed "09/2008" for a death recorded as
  * 12 September 2008. Read-only: nothing here writes, and no query, filter or
@@ -26,92 +33,6 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
  *   503  the database could not be read, so nothing can be said about whether
  *        the record exists
  */
-
-//The table a cemetery's data really lives in, from the name of the formatted
-//view findCemetery.js resolved the record through.
-//
-//This is the SAME derivation the save path uses (netlify/functions/updateRecord.js:
-//`cemetery.split("_", 2).join("_")`, i.e. "bcmg_data_formatted_2" -> "bcmg_data"),
-//applied to the same input, so a page can only ever show the table a save writes
-//to. It is deliberately not a hand-written table of names: a second list could
-//drift away from the write.
-function baseTableFor(cemeteryView) {
-  return String(cemeteryView).split('_', 2).join('_');
-}
-
-//The base table keeps a date as three separate columns — the month as a name
-//("Jan", "Sep"), the day and the year as numbers — while the page's display
-//rules (partials/record-display.ejs) read one string. So the parts are put back
-//together in the shape that file documents: month/day/year, with a zero standing
-//for a part that was never recorded ("01/28/1907", "09/12/2008", "0/0/1967").
-//Those rules drop a zero, so no zero is ever printed, and they suppress a day
-//that has no month. The month is written as a two-digit number because that is
-//how the formatted views write it (the view renders the same "Sep" as "09").
-const MONTHS = {
-  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
-};
-
-//A stored part of a date, or "" when nothing was recorded. A stored 0 is a
-//placeholder meaning "not recorded" here as much as an empty cell is.
-function recordedPart(value) {
-  if (value === null || value === undefined) return '';
-  const text = String(value).trim();
-  if (text === '' || /^0+$/.test(text)) return '';
-  return text;
-}
-
-//The month as a two-digit number: a stored name ("Sep", "September") or a
-//stored number. Anything unrecognisable counts as not recorded.
-function monthPart(value) {
-  const part = recordedPart(value);
-  if (part === '') return '';
-  if (/^\d+$/.test(part)) return part.length === 1 ? '0' + part : part;
-  return MONTHS[part.slice(0, 3).toLowerCase()] || '';
-}
-
-//The day, as stored. A day is only used when the record also carries its month,
-//so a stray day can never be printed as though it were a month.
-function dayPart(value) {
-  const part = recordedPart(value);
-  return /^\d+$/.test(part) ? part : '';
-}
-
-//The year. The display rules take a four-digit part as the year and nothing
-//else, so anything that is not four digits is left out rather than misplaced.
-function yearPart(value) {
-  const part = recordedPart(value);
-  return /^\d{4}$/.test(part) ? part : '';
-}
-
-//One date column of the base table, as the single string the display rules read.
-function composedDate(month, day, year) {
-  const monthText = monthPart(month);
-  const dayText = monthText === '' ? '' : dayPart(day);
-  const yearText = yearPart(year);
-  if (monthText === '' && dayText === '' && yearText === '') return '';
-  return (monthText || '0') + '/' + (dayText || '0') + '/' + (yearText || '0');
-}
-
-//The row as public/views/grave.ejs expects it: the base table's own columns,
-//plus the birth_date / death_date strings the page's display rules parse, and
-//the age the record carries (age_sane if the base table has that column; the
-//year difference the view itself worked out otherwise). A column the base table
-//does not have stays absent, and the page then renders exactly as it does for a
-//record with nothing recorded in it — never "undefined", never an empty row.
-function displayRecord(row) {
-  const record = Object.assign({}, row, {
-    birth_date: composedDate(row.birth_month, row.birth_day, row.birth_year),
-    death_date: composedDate(row.death_month, row.death_day, row.death_year)
-  });
-  if (recordedPart(record.age_sane) === '') {
-    const bornYear = Number(yearPart(row.birth_year));
-    const diedYear = Number(yearPart(row.death_year));
-    const years = (bornYear && diedYear) ? diedYear - bornYear : 0;
-    record.age_sane = years > 0 ? String(years) : '';
-  }
-  return record;
-}
 
 //The three views findCemetery.js can resolve, with the cemetery's display name
 //and the slug its search page is built from.

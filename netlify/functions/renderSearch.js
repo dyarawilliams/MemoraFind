@@ -1,6 +1,14 @@
 const { createClient } = require('@supabase/supabase-js');
 const ejs = require("ejs");
 const path = require("path");
+// The table a cemetery's data really lives in, and the way the base table's
+// three date columns become the one string the display rules parse. Both live in
+// baseRecord.js so that a result card and the person's own record page
+// (renderGrave.js) read the same row of the same table and compose a date the
+// same way — a card showed "09/2008" where the page showed "09/12/2008" before
+// this, because the card read the *_data_formatted_2 view and the page read the
+// base table.
+const { baseTableForCemetery, displayRecord } = require('./baseRecord');
 
 // Connect to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -83,30 +91,29 @@ exports.handler = async function (event, context) {
     }
 
     // Build the query
+    //
+    // The BASE table behind the cemetery's formatted view is read, not the view
+    // itself: the view drops the day of the month from a death date, so a card
+    // rendered from it showed "09/2008" for the person whose own page — reading
+    // the base table since the record-page change — showed "09/12/2008". The
+    // table name comes from the cemetery slug through the same derivation the
+    // save path and the record page use (baseRecord.js), so the card can only
+    // ever show the row a save writes.
+    //
+    // The columns are read as '*', the same way the record page reads its single
+    // record: the template renders the fields it knows and ignores the rest, and
+    // a column the base table does not have simply stays absent (the card then
+    // renders exactly as it does for a record with nothing recorded — never
+    // "undefined", never a stray 0). An explicit list would have to name every
+    // column of a table this function cannot see, and a wrong name would turn a
+    // working search into "the database is unavailable".
     let query = supabase
-        .from(`${cemetery}_data_formatted_2`)
+        .from(baseTableForCemetery(cemetery))
         // count: 'exact' makes PostgREST report how many rows match the whole
         // filter in the same request (the Content-Range total), independently of
         // how many rows are sent back. That is what lets the page state a real
         // total while the body itself carries at most RESULT_LIMIT records.
-        .select(`
-            memorial_id,
-            prefix,
-            last_name,
-            first_name,
-            middle_name,
-            maiden_name,
-            suffix,
-            birth_date,
-            death_date,
-            age_sane,
-            section,
-            lot,
-            is_vet,
-            notes,
-            moved_from,
-            moved_to
-        `, { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('last_name', { ascending: true });
 
     // Add optional elements to the query. A field with no value adds no filter:
@@ -130,7 +137,14 @@ exports.handler = async function (event, context) {
     try {
         const { data: queryData, count: queryCount, error } = await query;
         if (error) throw error;
-        data = queryData || [];
+        // The base table keeps a date as three columns (month name, day, year)
+        // while the display rules read the single "MM/DD/YYYY" string with zeros
+        // for the parts that were never recorded, so each row is composed the
+        // same way the record page composes it (baseRecord.displayRecord). This
+        // is the only change to the rows themselves: the values are the ones the
+        // table holds, and a part that is not recorded stays a placeholder the
+        // display rules drop.
+        data = (queryData || []).map(displayRecord);
         totalMatches = (typeof queryCount === "number") ? queryCount : null;
     } catch (error) {
         // The database could not be read. Say so plainly rather than showing an
