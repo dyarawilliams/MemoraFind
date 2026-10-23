@@ -18,11 +18,11 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
 // it is not a query change: it only decides whether the query is built.
 const YEAR_PATTERN = /^\d{4}$/;
 
-// How many records any single request may render. The browse path has always
-// asked for its first 50; the filtered path asked for everything, and Supabase's
-// own 1000-row cap then got printed as if it were a total. The cap now belongs
-// to the query on both paths (see RESULT_LIMIT below), so 1000 rows can no
-// longer be sent, let alone counted.
+// How many records any single request may render. It belongs to the query
+// itself (see the .range() call below), so a 1000-row response — Supabase's own
+// cap, once printed as if it were a total — can no longer be sent, let alone
+// counted. A page with no usable filter renders no records at all, so there is
+// nothing to cap there: it never reaches the database.
 const RESULT_LIMIT = 50;
 
 exports.handler = async function (event, context) {
@@ -60,12 +60,9 @@ exports.handler = async function (event, context) {
     const { lastName, firstName, maidenName, birthYear, deathYear } = event.queryStringParameters || {};
 
     // A query string is not the same thing as a search. `?lastName=&firstName=
-    // &maidenName=&birthYear=&deathYear=` and `?x=1` carry nothing to filter
-    // on, and they used to take the filtered path: a query with no filters and
-    // no limit, whose truncated result set the page then reported as "1000
-    // records found" (~3.4 MB). Only one of the five fields having a value
-    // makes this request a search; otherwise it is a browse, exactly like
-    // /search/<cemetery>. Values are trimmed so a field holding only spaces
+    // &maidenName=&birthYear=&deathYear=`, `?foo=bar` and a bare `?` carry
+    // nothing to filter on. Only one of the five fields having a value makes
+    // this request a search. Values are trimmed so a field holding only spaces
     // counts as blank too, and an unknown key is simply ignored.
     const asText = (value) => (typeof value === "string" ? value.trim() : "");
     const filterLastName = asText(lastName);
@@ -77,6 +74,29 @@ exports.handler = async function (event, context) {
     const hasSearchParams = Boolean(
         filterLastName || filterFirstName || filterMaidenName || filterBirthYear || filterDeathYear
     );
+
+    // No usable filter: the page lists nothing at all. Until this change an
+    // empty query listed the cemetery's first 50 records — a list nobody asked
+    // for, and one that read like a complete answer to a question that had not
+    // been asked. The page now shows its own heading, the search form it
+    // already had, and one line saying what to type; the database is not
+    // queried, because there is nothing to fetch, so nothing here can fail or
+    // be slow. This is the only path that changed: every request with a real
+    // filter below builds exactly the query it built before.
+    if (!hasSearchParams) {
+        return renderSearchPage({
+            cemetery,
+            title,
+            records: [],
+            hasSearchParams,
+            searched: false,
+            // Tells the template this is the "nothing typed yet" page, which is
+            // not the same thing as a search that matched nothing — the latter
+            // is a real result and says "0 records found".
+            awaitingSearch: true,
+            databaseUnavailable: false
+        });
+    }
 
     // A birth or death year has to be a year before it is sent to the database.
     // The birth_year / death_year columns are numeric, so a hand-typed "abc"
@@ -127,17 +147,19 @@ exports.handler = async function (event, context) {
         .select('*', { count: 'exact' })
         .order('last_name', { ascending: true });
 
-    // Add optional elements to the query. A field with no value adds no filter:
-    // with all five blank the query is the browse query, not an unbounded one.
+    // Add optional elements to the query. A field with no value adds no filter.
+    // A request with no value in any of the five has already returned above, so
+    // this is always a search: the same columns and the same operators as
+    // before.
     if (filterLastName) query = query.ilike('last_name', `%${filterLastName}%`);
     if (filterFirstName) query = query.ilike('first_name', `%${filterFirstName}%`);
     if (filterMaidenName) query = query.ilike('maiden_name', `%${filterMaidenName}%`);
     if (filterBirthYear) query = query.eq('birth_year', filterBirthYear);
     if (filterDeathYear) query = query.eq('death_year', filterDeathYear);
 
-    // The row cap is part of the query, on every path — browse and filtered
-    // alike. The template can only render what the database sent, so a 1000-row
-    // response is impossible rather than merely unlikely.
+    // The row cap is part of the query. The template can only render what the
+    // database sent, so a 1000-row response is impossible rather than merely
+    // unlikely.
     query = query.range(0, RESULT_LIMIT - 1);
 
     // totalMatches is the exact number of matching records, or null if the
