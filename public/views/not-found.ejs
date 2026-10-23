@@ -1,0 +1,82 @@
+<%
+  /* ------------------------------------------------------------------------
+     The page for an address that matches no route on the site at all — the
+     one a family member reaches by mistyping a link out of a text message, or
+     by following a link to a page that no longer exists. Until now Netlify
+     answered those with its own stock page, which carries no MemoraFind
+     header, nav or footer and tells the visitor to read Netlify's support
+     guide; this is the site's own page instead.
+
+     There is no function behind it and there does not need to be one: Netlify
+     serves public/404.html, with a 404 status, for any request that matches no
+     redirect rule and no file, so this template is rendered once by
+     tools/build-404.js into that static file. Nothing renders it per request.
+     Re-run `node tools/build-404.js` after changing this template or the
+     header/footer partials, and commit the regenerated public/404.html.
+
+     Wording: it says the address is not a page here and nothing more. It does
+     not guess why (a mistyped link, a moved page), it does not apologise for
+     something that did not happen, and it never says a record "was not found"
+     — no record was asked for. It points at the three cemeteries, the search
+     and the /grave/<record ID> shape, which are the ways on that do exist.
+     ------------------------------------------------------------------------ */
+  var cemeteries = [
+    { code: "bcmg", name: "Bamberg County Memory Gardens", short: "Memory Gardens" },
+    { code: "capernaum", name: "Capernaum Cemetery", short: "Capernaum" },
+    { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
+  ];
+%>
+<%- include('partials/header.ejs', {
+      pageTitle: 'Page not found — MemoraFind',
+      pageDescription: 'This address is not a page on MemoraFind. Search Bamberg County burial records by name, or open one of the three cemeteries.',
+      canonicalPath: false,
+      noindex: true
+    }) %>
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li aria-current="page">Page not found</li>
+                    </ol>
+                </nav>
+                <div class="section-head">
+                    <h1>This page does not exist</h1>
+                    <p>
+                        This address is not a page on MemoraFind. The burial records
+                        themselves are unaffected &mdash; only the address is.
+                    </p>
+                </div>
+                <div class="empty-state" role="status">
+                    <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M11 21.5l10-6M11 15.5l10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <h3>Ways to find what you were looking for</h3>
+                    <ul>
+                        <li>
+                            <a href="/#search">Search the records</a> by name, maiden name, birth
+                            year or death year. Searching is free and needs no account.
+                        </li>
+                        <li>
+                            Each cemetery has a page of its own:
+                            <a href="/search/bcmg">Bamberg County Memory Gardens</a>,
+                            <a href="/search/capernaum">Capernaum Cemetery</a> and
+                            <a href="/search/honeyford">Honey Ford Cemetery</a>.
+                        </li>
+                        <li>
+                            One person's page is <code>/grave/</code> followed by their record
+                            ID, for example <a href="/grave/1000004"><code>/grave/1000004</code></a>.
+                            Every search result shows the record ID it belongs to.
+                        </li>
+                    </ul>
+                    <div class="empty-state__actions">
+                        <a class="btn btn--primary" href="/#search">Search the records</a>
+                        <% cemeteries.forEach(function (cemetery) { %>
+                            <a class="btn btn--ghost" href="/search/<%= cemetery.code %>"><%= cemetery.short %></a>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+        </div>
+<%- include('partials/footer.ejs') %>

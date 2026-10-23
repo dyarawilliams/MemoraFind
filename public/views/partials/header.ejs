@@ -16,6 +16,14 @@
           ? pageDescription
           : "MemoraFind is a free grave-finder for Bamberg County, South Carolina: search burial records from Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery by name, maiden name, birth or death year.";
 
+      /* ---- noindex -------------------------------------------------------
+         A page that is not a destination of its own can ask not to be indexed.
+         Two pass it: the administrator update page (/search/update, an admin
+         lookup that has no business competing with the home page in a search
+         result) and the static 404 page (public/404.html, which has no address
+         of its own and is never the page someone meant to find). Every other
+         page leaves it out, so no crawlable page changes. */
+      var _noindex = (typeof noindex !== "undefined" && noindex === true);
       /* ---- Link previews (Open Graph / Twitter) --------------------------
          Shareable pages need absolute addresses, so every URL below is built
          on the production apex and never on a netlify host or a deploy-preview
@@ -24,10 +32,12 @@
 
          canonicalPath is optional and defaults to the home page. Only the
          templates whose real path is already known pass it, without a new
-         query: grave.ejs passes "/grave/<record ID>" and search.ejs passes
-         "/search/<cemetery slug>". Everything else (the landing page, the
-         update form, the not-found pages) keeps "/", which is the address
-         they are reached at today.
+         query: grave.ejs passes "/grave/<record ID>", search.ejs passes
+         "/search/<cemetery slug>" and update.ejs passes "/search/update",
+         which is the address that page is served at. The landing page keeps
+         "/". A template can also pass `false`, which prints no canonical and
+         no og:url at all: that is for the 404 page, which has no address of
+         its own and must not point search engines at the home page instead.
 
          The share image is a static file under public/assets/, so it is served
          straight from the CDN at /assets/og-card.png and no function is
@@ -36,21 +46,24 @@
          It says nothing about a section, lot or grave location, because the
          source data carries none for 2,425 of 2,428 records. */
       var SITE_ORIGIN = "https://memorafind.com";
-      var _canonicalPath = (typeof canonicalPath === "string" && canonicalPath.charAt(0) === "/")
-          ? canonicalPath
-          : "/";
-      var _canonicalUrl = SITE_ORIGIN + _canonicalPath;
+      var _canonicalPath = ((typeof canonicalPath !== "undefined") && canonicalPath === false)
+          ? null
+          : ((typeof canonicalPath === "string" && canonicalPath.charAt(0) === "/")
+              ? canonicalPath
+              : "/");
+      var _canonicalUrl = _canonicalPath ? SITE_ORIGIN + _canonicalPath : null;
       var _shareImage = SITE_ORIGIN + "/assets/og-card.png";
       var _shareImageAlt = "MemoraFind, Bamberg County, SC — search Bamberg County burial records; every person has a page of their own.";
     %>
     <title><%= _pageTitle %></title>
     <meta name="description" content="<%= _pageDescription %>" />
-    <link rel="canonical" href="<%= _canonicalUrl %>" />
+    <% if (_noindex) { %><meta name="robots" content="noindex, nofollow" /><% } %>
+    <% if (_canonicalUrl) { %><link rel="canonical" href="<%= _canonicalUrl %>" /><% } %>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="MemoraFind" />
     <meta property="og:title" content="<%= _pageTitle %>" />
     <meta property="og:description" content="<%= _pageDescription %>" />
-    <meta property="og:url" content="<%= _canonicalUrl %>" />
+    <% if (_canonicalUrl) { %><meta property="og:url" content="<%= _canonicalUrl %>" /><% } %>
     <meta property="og:image" content="<%= _shareImage %>" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
