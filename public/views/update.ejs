@@ -5,7 +5,16 @@
   var isSuccessMessage = (typeof locals.message === "string")
       && locals.message.toLowerCase().indexOf("success") !== -1;
 %>
-<%- include('partials/header.ejs', { pageTitle: 'Update a grave record — MemoraFind' }) %>
+<%-
+  /* The administrator update page is served at /search/update (netlify.toml
+     rewrites that address to getUpdateRecord.js), so that is its canonical
+     address — it used to declare the home page as its canonical, which made an
+     admin lookup compete with the home page in a search result. It also asks
+     not to be indexed: nobody reaches it by searching, and it is not a
+     destination for a family member. Both are head tags only; nothing about
+     the form, its fields or the save changes. */
+%>
+<%- include('partials/header.ejs', { pageTitle: 'Update a grave record — MemoraFind', canonicalPath: '/search/update', noindex: true }) %>
 
         <div class="page">
             <div class="container">

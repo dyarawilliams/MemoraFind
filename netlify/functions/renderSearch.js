@@ -26,8 +26,19 @@ const YEAR_PATTERN = /^\d{4}$/;
 const RESULT_LIMIT = 50;
 
 exports.handler = async function (event, context) {
-    // Extract cemetery from path
-    const cemetery = event.path.split('/').pop();
+    // Extract cemetery from path. The slug is the last segment that carries
+    // text, so a trailing slash resolves to the same cemetery: /search/bcmg/
+    // used to be read as an empty slug and answered "Cemetery not found",
+    // because the empty string after the final "/" was taken as the slug. A
+    // hand-typed or pasted address ending in "/" is common, and the record page
+    // (/grave/<id>/, renderGrave.js) has always accepted one, so the two now
+    // behave the same way. Only the slug changes here: the slug that comes out
+    // of a normal /search/<cemetery> address is the same string as before, and
+    // every query below is built exactly as it was.
+    const pathSegments = String(event.path || "")
+        .split("/")
+        .filter((segment) => segment !== "");
+    const cemetery = pathSegments.length > 0 ? pathSegments[pathSegments.length - 1] : "";
     // console.log("Cemetery parameter:", cemetery);
         
     // Validate cemetery
