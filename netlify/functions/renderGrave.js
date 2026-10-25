@@ -7,7 +7,7 @@ const { findCemetery } = require('./findCemetery');
 //baseRecord.js because the search result cards (renderSearch.js) need exactly the
 //same two things — a card and the person's own page must not be able to disagree
 //about a date.
-const { baseTableFor, displayRecord } = require('./baseRecord');
+const { baseTableFor, displayRecord, BASE_RECORD_COLUMNS } = require('./baseRecord');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -24,8 +24,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API
  * carry the day of the month of
  * a death date: 2,154 records hold one and the view shows a day on none of
  * them, which meant the page showed "09/2008" for a death recorded as
- * 12 September 2008. Read-only: nothing here writes, and no query, filter or
- * column list beyond the table the read points at is changed.
+ * 12 September 2008. Read-only: nothing here writes. The columns fetched are
+ * BASE_RECORD_COLUMNS in baseRecord.js, the same list the search cards use.
  *
  * Status codes say what actually happened:
  *   200  the record was read
@@ -136,14 +136,14 @@ exports.handler = async function (event, context) {
 
   //Read the one record that was asked for, from the base table behind the view:
   //the record ID is the only filter, and the result is capped to a single row.
-  //Every column is taken, so a column the page shows is read from the table the
-  //save writes whenever the base table has it.
+  //The columns are the ones the page renders and the ones displayRecord uses
+  //to compose a date — the same list the search cards select.
   let record = null;
   const baseTable = baseTableFor(cemeteryView);
   try {
     const { data, error } = await supabase
       .from(baseTable)
-      .select('*')
+      .select(BASE_RECORD_COLUMNS.join(','))
       .eq('memorial_id', requestedId)
       .limit(1);
 
