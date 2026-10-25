@@ -272,12 +272,14 @@ async function main() {
   check('search keeps the exact count alongside *', searchCall.selectOptions && searchCall.selectOptions.count === 'exact');
 
   const viewOnly = ['age_sane', 'notes', 'moved_from', 'moved_to'];
-  const legacyViewSelect = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/search.js'), 'utf8');
   const csvHeader = fs.readFileSync(path.resolve(__dirname, '../python-scraper/parsed_names_bcmg.csv'), 'utf8').split(/\r?\n/)[0].split(',');
   viewOnly.forEach(function (name) {
-    check(name + ' is selected from the formatted view by the legacy handler', legacyViewSelect.indexOf(name) !== -1);
     check(name + ' is not a column the scraper CSV loads into the base table', csvHeader.indexOf(name) === -1);
   });
+  check(
+    'the legacy search handler is gone',
+    !fs.existsSync(path.resolve(__dirname, '../netlify/functions/search.js'))
+  );
   const searchSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/renderSearch.js'), 'utf8');
   const graveSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/renderGrave.js'), 'utf8');
   check('search no longer names a column list', searchSource.indexOf('BASE_RECORD_COLUMNS') === -1 && searchSource.indexOf(".select('*', { count: 'exact' })") !== -1);

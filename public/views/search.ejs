@@ -1,15 +1,14 @@
 <%
-  /* Everything below is derived only from the locals the functions already
-     pass (see netlify/functions/renderSearch.js and search.js):
+  /* Everything below is derived only from the locals renderSearch.js passes:
 
-       cemetery         "bcmg" | "capernaum" | "honeyford"   (renderSearch only)
-       title            cemetery display name                (renderSearch only)
+       cemetery         "bcmg" | "capernaum" | "honeyford"
+       title            cemetery display name
        records          array of rows from the cemetery's base table
        hasSearchParams  true when the request carried a usable filter
-       awaitingSearch   true when it carried none at all      (renderSearch only)
+       awaitingSearch   true when it carried none at all
 
-     `locals.x` is used instead of a bare identifier so that the template also
-     renders for netlify/functions/search.js, which passes records only. */
+     `locals.x` is used instead of a bare identifier so a missing local is
+     blank rather than a crash. */
   var cemeteryCode = (typeof locals.cemetery === "string") ? locals.cemetery : "";
   var cemeteryName = (typeof locals.title === "string") ? locals.title : "";
   var rows = Array.isArray(locals.records) ? locals.records : [];
@@ -222,9 +221,10 @@
                             </p>
                         </div>
                     <% } else if (!didSearch) { %>
-                        <% /* Only a caller that passes records without hasSearchParams can
-                              reach this (the legacy search.js); renderSearch.js answers a
-                              request with no usable filter above, before this section. */ %>
+                        <% /* renderSearch.js sets hasSearchParams on every response, and a
+                              request with no usable filter is the awaitingSearch section
+                              above. This branch is the prompt for a render that passes
+                              records without that flag. */ %>
                         <div class="empty-state">
                             <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
                                 <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
@@ -249,8 +249,8 @@
                                       .filter(function (part) { return part && String(part).trim() !== ""; })
                                       .join(" ");
                                   /* Dates and age are formatted for display only: a zero part
-                                     the view wrote as a placeholder is not shown as a real day,
-                                     month, year or age (see partials/record-display.ejs). */
+                                     displayRecord wrote as a placeholder is not shown as a real
+                                     day, month, year or age (see partials/record-display.ejs). */
                                   var bornDate = display.formatRecordedDate(record.birth_date);
                                   var diedDate = display.formatRecordedDate(record.death_date);
                                   var ageYears = display.formatRecordedAge(record.age_sane);

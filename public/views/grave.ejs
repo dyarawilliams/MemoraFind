@@ -4,8 +4,9 @@
      Rendered by netlify/functions/renderGrave.js.
 
      Locals:
-       record        one row from <cemetery>_data_formatted_2 — the same
-                     columns the search cards read
+       record        one row of the cemetery's base table, composed by
+                     displayRecord in baseRecord.js — the same row the
+                     search cards read
        cemeteryName  display name of the cemetery the row belongs to
        cemeteryCode  "bcmg" | "capernaum" | "honeyford", the slug the
                      cemetery's search page is built from
@@ -59,7 +60,7 @@
 
   /* A title and a description that make sense when the address is pasted into
      a message: the name, the years the record actually carries, and the
-     cemetery. A year the view wrote as a zero placeholder is left out rather
+     cemetery. A year displayRecord wrote as a zero placeholder is left out rather
      than printed (see partials/record-display.ejs). No location is claimed. */
   var yearsText = "";
   if (bornYear && diedYear) yearsText = bornYear + "–" + diedYear;
