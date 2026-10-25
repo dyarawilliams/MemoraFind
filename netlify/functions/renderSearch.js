@@ -8,7 +8,7 @@ const path = require("path");
 // same way — a card showed "09/2008" where the page showed "09/12/2008" before
 // this, because the card read the *_data_formatted_2 view and the page read the
 // base table.
-const { baseTableForCemetery, displayRecord } = require('./baseRecord');
+const { baseTableForCemetery, displayRecord, BASE_RECORD_COLUMNS } = require('./baseRecord');
 
 // Connect to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -24,6 +24,18 @@ const YEAR_PATTERN = /^\d{4}$/;
 // counted. A page with no usable filter renders no records at all, so there is
 // nothing to cap there: it never reaches the database.
 const RESULT_LIMIT = 50;
+
+//PostgreSQL ILIKE treats "%" and "_" as wildcards and "\" as the escape
+//character. A name the visitor typed has to match as characters, so those
+//three are escaped before the same leading and trailing "%" that make the
+//filter a substring search. The supabase client sends the pattern as the
+//value of `ilike.<pattern>`; PostgREST binds that value as a parameter and
+//does not strip the backslashes. (A typed "*" is a separate PostgREST alias
+//for "%" on ilike, rewritten even when a backslash precedes it, so it cannot
+//be made literal through this operator.)
+function literalIlikePattern(text) {
+    return '%' + String(text).replace(/[\\%_]/g, '\\$&') + '%';
+}
 
 exports.handler = async function (event, context) {
     // Extract cemetery from path. The slug is the last segment that carries
@@ -81,8 +93,8 @@ exports.handler = async function (event, context) {
     // been asked. The page now shows its own heading, the search form it
     // already had, and one line saying what to type; the database is not
     // queried, because there is nothing to fetch, so nothing here can fail or
-    // be slow. This is the only path that changed: every request with a real
-    // filter below builds exactly the query it built before.
+    // be slow. A request that does carry a filter is still capped at
+    // RESULT_LIMIT rows and still asks for an exact count.
     if (!hasSearchParams) {
         return renderSearchPage({
             cemetery,
@@ -104,8 +116,7 @@ exports.handler = async function (event, context) {
     // database is temporarily unavailable" — the wrong cause, and advice
     // ("try again shortly") that could never help. The query is not built at
     // all in that case; the page says what is wrong with the input instead.
-    // Nothing about a valid query changes: the same columns and the same
-    // filters as before.
+    // A year that is four digits is still an exact match on that column.
     const invalidYears = [];
     if (filterBirthYear && !YEAR_PATTERN.test(filterBirthYear)) invalidYears.push("birth year");
     if (filterDeathYear && !YEAR_PATTERN.test(filterDeathYear)) invalidYears.push("death year");
@@ -127,33 +138,28 @@ exports.handler = async function (event, context) {
     // itself: the view drops the day of the month from a death date, so a card
     // rendered from it showed "09/2008" for the person whose own page — reading
     // the base table since the record-page change — showed "09/12/2008". The
-    // table name comes from the cemetery slug through the same derivation the
-    // save path and the record page use (baseRecord.js), so the card can only
-    // ever show the row a save writes.
+    // table name comes from the cemetery slug through baseRecord.js, the same
+    // map the record page uses, so the card reads the table that map names.
     //
-    // The columns are read as '*', the same way the record page reads its single
-    // record: the template renders the fields it knows and ignores the rest, and
-    // a column the base table does not have simply stays absent (the card then
-    // renders exactly as it does for a record with nothing recorded — never
-    // "undefined", never a stray 0). An explicit list would have to name every
-    // column of a table this function cannot see, and a wrong name would turn a
-    // working search into "the database is unavailable".
+    // The columns are the ones the card renders and the ones displayRecord uses
+    // to compose a date (baseRecord.BASE_RECORD_COLUMNS). The same list is what
+    // the record page selects, so a card and a page still read the same fields.
     let query = supabase
         .from(baseTableForCemetery(cemetery))
         // count: 'exact' makes PostgREST report how many rows match the whole
         // filter in the same request (the Content-Range total), independently of
         // how many rows are sent back. That is what lets the page state a real
         // total while the body itself carries at most RESULT_LIMIT records.
-        .select('*', { count: 'exact' })
+        .select(BASE_RECORD_COLUMNS.join(','), { count: 'exact' })
         .order('last_name', { ascending: true });
 
     // Add optional elements to the query. A field with no value adds no filter.
     // A request with no value in any of the five has already returned above, so
-    // this is always a search: the same columns and the same operators as
-    // before.
-    if (filterLastName) query = query.ilike('last_name', `%${filterLastName}%`);
-    if (filterFirstName) query = query.ilike('first_name', `%${filterFirstName}%`);
-    if (filterMaidenName) query = query.ilike('maiden_name', `%${filterMaidenName}%`);
+    // this is always a search. Name filters stay case-insensitive substrings;
+    // "%" and "_" and "\" in the typed text match themselves (literalIlikePattern).
+    if (filterLastName) query = query.ilike('last_name', literalIlikePattern(filterLastName));
+    if (filterFirstName) query = query.ilike('first_name', literalIlikePattern(filterFirstName));
+    if (filterMaidenName) query = query.ilike('maiden_name', literalIlikePattern(filterMaidenName));
     if (filterBirthYear) query = query.eq('birth_year', filterBirthYear);
     if (filterDeathYear) query = query.eq('death_year', filterDeathYear);
 

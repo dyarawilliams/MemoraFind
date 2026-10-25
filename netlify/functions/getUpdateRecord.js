@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const ejs = require('ejs');
 const path = require('path');
 const { findCemetery } = require('./findCemetery');
+const { baseTableFor } = require('./baseRecord');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -21,24 +22,13 @@ const INVALID_MEMORIAL_ID_MESSAGE = 'A Memorial ID is a number, for example 1001
 //and changes nothing about how a real ID is queried.
 const MEMORIAL_ID_PATTERN = /^\d+$/;
 
-//The table a cemetery's data really lives in, from the name of the formatted
-//view findCemetery.js resolves the record through.
-//
-//This is the SAME derivation the save path uses (netlify/functions/updateRecord.js:
-//`cemetery.split("_", 2).join("_")`, i.e. "bcmg_data_formatted_2" -> "bcmg_data"),
-//applied to the same input, so the form can only ever show the table the save
-//writes to. It is deliberately not a hand-written table of names: a second list
-//could drift away from the write and put the form back out of step with it.
-//
 //Why the form does not read the view it used to: the view drops the day of the
 //month from the death date (2,154 records carry one, the view shows none of
 //them), while the base table holds it. A form rendered from the view therefore
 //shows a death day that is empty for a record that has one, and an untouched
 //save would clear it. Reading the base table shows what is stored, which is also
-//what the save compares against.
-function baseTableFor(cemeteryView) {
-  return String(cemeteryView).split('_', 2).join('_');
-}
+//what the save compares against. Which table that is comes from baseTableFor
+//(baseRecord.js), not from a second copy of the name.
 
 //Render the update page (lookup form plus a message) as an HTML response.
 async function renderUpdatePage(templateData) {
@@ -111,7 +101,7 @@ exports.handler = async function (event, context) {
   // If the cemetery variable is not null, it means the memorial_id was found
   // in one of the cemetery views
   // The record itself is read from the base table the save writes to, not from
-  // the view — see baseTableFor() above.
+  // the view. baseTableFor is the shared map in baseRecord.js.
   const baseTable = baseTableFor(cemetery);
   // Set up query to get the record from the cemetery's base table
   // Use the base table derived from the cemetery variable to select the table

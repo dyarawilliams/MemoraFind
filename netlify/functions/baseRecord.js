@@ -26,37 +26,86 @@
  *    and that is exactly the bug being fixed: the card showed "09/2008" where
  *    the page showed "09/12/2008" because the two read different sources.
  *
- * Nothing here queries, writes or renders: no database object is created, no
- * template is read, and no column list lives here. It is only names and string
- * handling, so it can be required by a Netlify function without a side effect.
- * (Netlify treats every .js file in netlify/functions/ as a function entry
- * point; this one exports no handler, exactly like the existing
- * findCemetery.js helper next to it.)
+ * Nothing here queries, writes or renders: no database object is created and
+ * no template is read. It is names and string handling, so it can be required
+ * by a Netlify function without a side effect. (Netlify treats every .js file
+ * in netlify/functions/ as a function entry point; this one exports no handler,
+ * exactly like the existing findCemetery.js helper next to it.)
  */
 
-//The suffix every cemetery view carries, so a cemetery slug ("bcmg") and the
-//view findCemetery.js resolves a record through ("bcmg_data_formatted_2") name
-//the same base table.
+//The suffix every cemetery view carries ("bcmg_data_formatted_2"). The map
+//below is what a view or a slug resolves to; this suffix is the one those
+//view names end with.
 const VIEW_SUFFIX = '_data_formatted_2';
 
-//The table a cemetery's data really lives in, from the name of the formatted
-//view findCemetery.js resolved the record through.
+//The three cemeteries, each named once. findCemetery.js resolves a record to a
+//view; a search names the cemetery by its slug. Both have to reach the same
+//base table.
 //
-//This is the SAME derivation the save path uses (netlify/functions/updateRecord.js:
-//`cemetery.split("_", 2).join("_")`, i.e. "bcmg_data_formatted_2" -> "bcmg_data"),
-//applied to the same input, so a read can only ever name the table a save writes
-//to. It is deliberately not a hand-written table of names: a second list could
-//drift away from the write.
+//This used to be `String(view).split('_', 2).join('_')`, the same expression
+//updateRecord.js still uses when it writes. That split is right for every
+//cemetery this site has — "bcmg_data_formatted_2" becomes "bcmg_data" — only
+//because none of the three codes contains an underscore. The second piece of
+//the split is the word "data", and a code that itself contained an underscore
+//("honey_ford_data_formatted_2") would be read as the table "honey_ford",
+//dropping "_data". The map below names the table directly. A view or a slug
+//that is not one of these three is not given a guessed name.
+const CEMETERY_TABLES = {
+  bcmg: { view: 'bcmg_data_formatted_2', table: 'bcmg_data' },
+  capernaum: { view: 'capernaum_data_formatted_2', table: 'capernaum_data' },
+  honeyford: { view: 'honeyford_data_formatted_2', table: 'honeyford_data' }
+};
+
+const BASE_TABLE_BY_VIEW = {};
+Object.keys(CEMETERY_TABLES).forEach(function (code) {
+  BASE_TABLE_BY_VIEW[CEMETERY_TABLES[code].view] = CEMETERY_TABLES[code].table;
+});
+
+//The table a cemetery's data really lives in, from the view name
+//findCemetery.js resolved the record through. null when that view is not one
+//of the three cemeteries — a guessed name would be the bug above.
 function baseTableFor(cemeteryView) {
-  return String(cemeteryView).split('_', 2).join('_');
+  return BASE_TABLE_BY_VIEW[String(cemeteryView)] || null;
 }
 
 //The same table, named from the cemetery slug a search request carries
-//("bcmg" -> "bcmg_data"). The slug goes through the identical derivation as the
-//view name, so there is still only one expression deciding which table is read.
+//("bcmg" -> "bcmg_data").
 function baseTableForCemetery(cemeteryCode) {
-  return baseTableFor(String(cemeteryCode) + VIEW_SUFFIX);
+  const entry = CEMETERY_TABLES[String(cemeteryCode)];
+  return entry ? entry.table : null;
 }
+
+//Columns a search card and a record page fetch from the base table.
+//
+//public/views/search.ejs, public/views/grave.ejs and
+//public/views/partials/fact-burial-location.ejs render memorial_id, the name
+//parts, is_vet, age_sane, section, lot, notes, moved_from and moved_to.
+//birth_date and death_date are not columns: displayRecord() composes them
+//from the month / day / year columns below, and fills in age_sane from the
+//years when the row did not carry one. Anything not in this list is not
+//fetched.
+const BASE_RECORD_COLUMNS = [
+  'memorial_id',
+  'prefix',
+  'first_name',
+  'middle_name',
+  'maiden_name',
+  'last_name',
+  'suffix',
+  'is_vet',
+  'birth_month',
+  'birth_day',
+  'birth_year',
+  'death_month',
+  'death_day',
+  'death_year',
+  'age_sane',
+  'section',
+  'lot',
+  'notes',
+  'moved_from',
+  'moved_to'
+];
 
 //The base table keeps a date as three separate columns — the month as a name
 //("Jan", "Sep"), the day and the year as numbers — while the page's display
@@ -145,5 +194,7 @@ module.exports = {
   dayPart,
   yearPart,
   VIEW_SUFFIX,
-  MONTHS
+  MONTHS,
+  CEMETERY_TABLES,
+  BASE_RECORD_COLUMNS
 };
