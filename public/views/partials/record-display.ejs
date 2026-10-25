@@ -2,9 +2,10 @@
   /* ------------------------------------------------------------------------
      Shared display rules for a record's dates, age and "not recorded"
      wording. They are used by the search cards (public/views/search.ejs) and
-     by the single-record page (public/views/grave.ejs): both show the same
-     columns of the same <cemetery>_data_formatted_2 view, and a value has to
-     read identically on both, so the rules live here once.
+     by the single-record page (public/views/grave.ejs): both are given the
+     same row, composed by displayRecord in netlify/functions/baseRecord.js
+     from that cemetery's base table, and a value has to read identically on
+     both, so the rules live here once.
 
      How to use it — pass in a plain object to fill in:
 
@@ -17,7 +18,7 @@
      are read, or how they are queried, changes.
 
      ------------------------------------------------------------------------
-     birth_date / death_date arrive from the view as a month/day/year string in
+     birth_date / death_date arrive from displayRecord as a month/day/year string in
      which a part that was never recorded is written as zero: "00/0/1967"
      (year only), "03/0/1886" (month and year), "07/0", "02/14/0" and "00/0/0"
      (nothing recorded). A zero is a placeholder, not a day, a month or a year,

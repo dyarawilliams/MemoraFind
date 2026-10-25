@@ -22,8 +22,9 @@
                 <div class="panel panel--search panel--overlap">
                     <h2 id="search-panel-title">Search burial records</h2>
                     <p class="panel__intro">
-                        Choose a cemetery, then enter as much as you know. Every field is optional
-                        except the cemetery — the more you enter, the narrower the search.
+                        Choose a cemetery, then enter at least one name or year. A last name, a
+                        maiden name, or a birth year is enough to start, and each extra field
+                        narrows the search.
                     </p>
 
                     <form action="/search" method="GET" id="search-form-1" class="form__grid" data-search-form>
@@ -46,8 +47,8 @@
                     </form>
 
                     <p class="panel__foot">
-                        Leave any field blank to see every record in that cemetery. Records can be
-                        corrected by a library administrator — see
+                        Leaving every field blank lists no records and does not look anything up.
+                        Records can be corrected by a library administrator — see
                         <a href="/.netlify/functions/updatePage">Update a record</a>.
                     </p>
                 </div>
@@ -58,7 +59,7 @@
             <div class="container">
                 <div class="section-head">
                     <h2 id="cemeteries-title">Cemeteries in Bamberg County</h2>
-                    <p>Three cemeteries are recorded here today. Choose one to browse its records.</p>
+                    <p>Three cemeteries are recorded here today. Choose one to search its records.</p>
                 </div>
 
                 <div class="cemetery-grid">
