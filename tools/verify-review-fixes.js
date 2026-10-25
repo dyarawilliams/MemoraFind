@@ -6,8 +6,8 @@
  * The real handlers and the real EJS templates run against a stubbed Supabase
  * client. The script exits 0 when every check passes, and 1 otherwise.
  *
- * What a stub cannot tell us is whether every name in BASE_RECORD_COLUMNS
- * exists on the live base tables. That limit is printed at the end.
+ * Reads use select('*'). A named column list cannot be checked here against
+ * the live base tables, and a missing name rejects the whole query.
  */
 
 'use strict';
@@ -267,37 +267,21 @@ async function main() {
   const none = await renderSearch.handler({ path: '/search/bcmg', queryStringParameters: { lastName: 'Zz%' } }, {});
   check('a search that matches nothing says 0 and still escapes the pattern', none.body.indexOf('0 records found') !== -1 && ilike(dataCalls()[0], 'last_name').pattern === patternFor('Zz%'));
 
-  // --- 2. Explicit columns ------------------------------------------------
-  const columnList = baseRecord.BASE_RECORD_COLUMNS.join(',');
-  same('search select list is the shared column list', searchCall.select, columnList);
-  check('search does not select *', searchCall.select !== '*' && searchCall.select.indexOf('*') === -1);
+  // --- 2. Reads cannot fail on a missing column --------------------------
+  same('search selects every column', searchCall.select, '*');
+  check('search keeps the exact count alongside *', searchCall.selectOptions && searchCall.selectOptions.count === 'exact');
 
-  const templateFiles = [
-    'public/views/search.ejs',
-    'public/views/grave.ejs',
-    'public/views/partials/fact-burial-location.ejs'
-  ];
-  const composed = { birth_date: true, death_date: true };
-  const used = {};
-  templateFiles.forEach(function (file) {
-    const text = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
-    const re = /(?:record|__locationRecord)\.([A-Za-z_][A-Za-z0-9_]*)/g;
-    let match;
-    while ((match = re.exec(text))) used[match[1]] = file;
-    const literal = /record\[\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\s*\]/g;
-    while ((match = literal.exec(text))) used[match[1]] = file;
+  const viewOnly = ['age_sane', 'notes', 'moved_from', 'moved_to'];
+  const legacyViewSelect = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/search.js'), 'utf8');
+  const csvHeader = fs.readFileSync(path.resolve(__dirname, '../python-scraper/parsed_names_bcmg.csv'), 'utf8').split(/\r?\n/)[0].split(',');
+  viewOnly.forEach(function (name) {
+    check(name + ' is selected from the formatted view by the legacy handler', legacyViewSelect.indexOf(name) !== -1);
+    check(name + ' is not a column the scraper CSV loads into the base table', csvHeader.indexOf(name) === -1);
   });
-  Object.keys(used).forEach(function (field) {
-    if (composed[field]) {
-      check(field + ' is composed by displayRecord, not selected', baseRecord.BASE_RECORD_COLUMNS.indexOf(field) === -1);
-      return;
-    }
-    check('column list includes ' + field + ' (' + used[field] + ')', baseRecord.BASE_RECORD_COLUMNS.indexOf(field) !== -1);
-  });
-  ['birth_month', 'birth_day', 'birth_year', 'death_month', 'death_day', 'death_year', 'age_sane'].forEach(function (field) {
-    check('displayRecord input ' + field + ' is selected', baseRecord.BASE_RECORD_COLUMNS.indexOf(field) !== -1);
-  });
-  check('templates mention notes, moved_from and moved_to', used.notes && used.moved_from && used.moved_to && used.section && used.lot && used.age_sane);
+  const searchSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/renderSearch.js'), 'utf8');
+  const graveSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/renderGrave.js'), 'utf8');
+  check('search no longer names a column list', searchSource.indexOf('BASE_RECORD_COLUMNS') === -1 && searchSource.indexOf(".select('*', { count: 'exact' })") !== -1);
+  check('grave no longer names a column list', graveSource.indexOf('BASE_RECORD_COLUMNS') === -1 && graveSource.indexOf(".select('*')") !== -1);
 
   const composedRow = baseRecord.displayRecord({
     birth_month: 'Sep',
@@ -319,7 +303,7 @@ async function main() {
   const graveCall = dataCalls()[0];
   check('grave page is 200', grave.statusCode === 200);
   same('grave reads the base table for the view findCemetery resolved', graveCall && graveCall.table, 'capernaum_data');
-  same('grave select list is the shared column list', graveCall && graveCall.select, columnList);
+  same('grave selects every column', graveCall && graveCall.select, '*');
   same('grave still reads one row by memorial id', [graveCall.limit, graveCall.filters], [1, [{ op: 'eq', column: 'memorial_id', value: '1000004' }]]);
   check('grave shows dates, age, notes, relocation and location',
     grave.body.indexOf('01/28/1907') !== -1 &&
@@ -418,13 +402,11 @@ async function main() {
   }
 
   console.log('');
-  console.log('Not checked against a live database: whether every name in');
-  console.log('BASE_RECORD_COLUMNS exists on bcmg_data, capernaum_data and');
-  console.log('honeyford_data. notes, moved_from, moved_to and age_sane are');
-  console.log('included because the templates and displayRecord read them.');
-  console.log('A name the base table does not have makes PostgREST reject the');
-  console.log('query (search says the database is unavailable; a grave page');
-  console.log('answers 503). No Supabase credentials are in this environment.');
+  console.log('Not checked against a live database. select(\'*\') does not name');
+  console.log('a column, so a missing name cannot reject the read. Which of');
+  console.log('age_sane, notes, moved_from and moved_to the base tables lack');
+  console.log('is still unknown; those four are on the formatted views and');
+  console.log('absent from the scraper CSVs. No Supabase credentials here.');
 }
 
 main().catch(function (error) {
