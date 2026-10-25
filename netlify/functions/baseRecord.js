@@ -75,38 +75,6 @@ function baseTableForCemetery(cemeteryCode) {
   return entry ? entry.table : null;
 }
 
-//Columns a search card and a record page fetch from the base table.
-//
-//public/views/search.ejs, public/views/grave.ejs and
-//public/views/partials/fact-burial-location.ejs render memorial_id, the name
-//parts, is_vet, age_sane, section, lot, notes, moved_from and moved_to.
-//birth_date and death_date are not columns: displayRecord() composes them
-//from the month / day / year columns below, and fills in age_sane from the
-//years when the row did not carry one. Anything not in this list is not
-//fetched.
-const BASE_RECORD_COLUMNS = [
-  'memorial_id',
-  'prefix',
-  'first_name',
-  'middle_name',
-  'maiden_name',
-  'last_name',
-  'suffix',
-  'is_vet',
-  'birth_month',
-  'birth_day',
-  'birth_year',
-  'death_month',
-  'death_day',
-  'death_year',
-  'age_sane',
-  'section',
-  'lot',
-  'notes',
-  'moved_from',
-  'moved_to'
-];
-
 //The base table keeps a date as three separate columns — the month as a name
 //("Jan", "Sep"), the day and the year as numbers — while the page's display
 //rules (partials/record-display.ejs) read one string. So the parts are put back
@@ -195,6 +163,5 @@ module.exports = {
   yearPart,
   VIEW_SUFFIX,
   MONTHS,
-  CEMETERY_TABLES,
-  BASE_RECORD_COLUMNS
+  CEMETERY_TABLES
 };

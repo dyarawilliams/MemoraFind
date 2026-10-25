@@ -8,7 +8,7 @@ const path = require("path");
 // same way — a card showed "09/2008" where the page showed "09/12/2008" before
 // this, because the card read the *_data_formatted_2 view and the page read the
 // base table.
-const { baseTableForCemetery, displayRecord, BASE_RECORD_COLUMNS } = require('./baseRecord');
+const { baseTableForCemetery, displayRecord } = require('./baseRecord');
 
 // Connect to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -141,16 +141,24 @@ exports.handler = async function (event, context) {
     // table name comes from the cemetery slug through baseRecord.js, the same
     // map the record page uses, so the card reads the table that map names.
     //
-    // The columns are the ones the card renders and the ones displayRecord uses
-    // to compose a date (baseRecord.BASE_RECORD_COLUMNS). The same list is what
-    // the record page selects, so a card and a page still read the same fields.
+    // Every column is read. Naming columns (the list added for the unused-column
+    // review) made PostgREST reject the query, and the page then says the
+    // database is unavailable: one listed name is not a column of the base
+    // table. The formatted views carry age_sane, notes, moved_from and
+    // moved_to, and the scraper CSVs that filled these tables do not, so those
+    // four are the names that can fail a list. Which of them is actually
+    // absent is not known here. A '*' read leaves a missing column off the
+    // row, and the templates already treat that as nothing recorded. Limiting
+    // the select to the columns the pages show has to wait until the live
+    // schema is known; until then '*' also returns columns the page does not
+    // show.
     let query = supabase
         .from(baseTableForCemetery(cemetery))
         // count: 'exact' makes PostgREST report how many rows match the whole
         // filter in the same request (the Content-Range total), independently of
         // how many rows are sent back. That is what lets the page state a real
         // total while the body itself carries at most RESULT_LIMIT records.
-        .select(BASE_RECORD_COLUMNS.join(','), { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('last_name', { ascending: true });
 
     // Add optional elements to the query. A field with no value adds no filter.
