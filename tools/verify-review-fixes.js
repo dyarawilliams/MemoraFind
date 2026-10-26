@@ -1,13 +1,18 @@
 /*
- * Checks the three review fixes without a database and without a test runner.
+ * Checks the review fixes without a database and without a test runner.
  *
  *   node tools/verify-review-fixes.js
  *
  * The real handlers and the real EJS templates run against a stubbed Supabase
  * client. The script exits 0 when every check passes, and 1 otherwise.
  *
- * Reads use select('*'). A named column list cannot be checked here against
- * the live base tables, and a missing name rejects the whole query.
+ * Reads, and the save's returning select, use select('*'). A named column
+ * list cannot be checked here against the live base tables, and a missing
+ * name rejects the whole query.
+ *
+ * Admin sign-in is exercised here too: login success and failure, lockout,
+ * logout, a rejected anonymous save, the field allowlist, and a missing
+ * cemetery. This script sets the admin environment variables itself.
  */
 
 'use strict';
@@ -15,6 +20,10 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const crypto = require('crypto');
+const querystring = require('querystring');
+
+const ADMIN_PASSWORD = 'correct-horse-battery';
 
 const failures = [];
 let passed = 0;
@@ -67,6 +76,11 @@ const calls = [];
 let next = { rows: [], count: null, error: null, view: null };
 
 function respond(state) {
+  if (state.update) {
+    if (next.updateError) return { data: null, error: next.updateError };
+    if (Array.isArray(next.updatedRows)) return { data: next.updatedRows, error: null };
+    return { data: next.rows, error: null };
+  }
   if (String(state.table).endsWith('_formatted_2')) {
     if (next.view && state.table === next.view) {
       const idFilter = state.filters.find(function (filter) {
@@ -107,10 +121,26 @@ function makeBuilder(state) {
       state.limit = n;
       return builder;
     },
+    update: function (payload) {
+      state.update = JSON.parse(JSON.stringify(payload));
+      return builder;
+    },
+    single: function () {
+      state.single = true;
+      return builder;
+    },
     then: function (resolve, reject) {
       const snapshot = JSON.parse(JSON.stringify(state));
       calls.push(snapshot);
-      return Promise.resolve(respond(state)).then(resolve, reject);
+      let result = respond(state);
+      if (state.single) {
+        const rows = result.data;
+        result = {
+          data: Array.isArray(rows) && rows.length > 0 ? rows[0] : null,
+          error: result.error
+        };
+      }
+      return Promise.resolve(result).then(resolve, reject);
     }
   };
   return builder;
@@ -126,7 +156,9 @@ function createClient() {
         filters: [],
         order: null,
         range: null,
-        limit: null
+        limit: null,
+        update: null,
+        single: false
       });
     }
   };
@@ -142,11 +174,20 @@ Module._load = function (request, parent, isMain) {
 
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost';
 process.env.SUPABASE_API_KEY = process.env.SUPABASE_API_KEY || 'test-key';
+process.env.ADMIN_EMAIL = 'admin@memorafind.test';
+process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
+process.env.ADMIN_SESSION_SECRET = 'test-session-secret-0123456789';
+delete process.env.ADMIN_PASSWORD_HASH;
 
 const baseRecord = require('../netlify/functions/baseRecord');
 const renderSearch = require('../netlify/functions/renderSearch');
 const renderGrave = require('../netlify/functions/renderGrave');
 const getUpdateRecord = require('../netlify/functions/getUpdateRecord');
+const login = require('../netlify/functions/login');
+const logout = require('../netlify/functions/logout');
+const updatePage = require('../netlify/functions/updatePage');
+const updateRecord = require('../netlify/functions/updateRecord');
+const adminSession = require('../netlify/functions/adminSession');
 
 function reset(partial) {
   calls.length = 0;
@@ -191,6 +232,72 @@ const FULL_ROW = {
   moved_from: 'Plot A_1',
   moved_to: 'Plot B\\2'
 };
+
+function cookieHeaders(response) {
+  const found = [];
+  const multi = response.multiValueHeaders || {};
+  const multiCookies = multi['Set-Cookie'] || multi['set-cookie'];
+  if (Array.isArray(multiCookies)) found.push.apply(found, multiCookies);
+  const headers = response.headers || {};
+  const single = headers['Set-Cookie'] || headers['set-cookie'];
+  if (Array.isArray(single)) found.push.apply(found, single);
+  else if (typeof single === 'string') found.push(single);
+  return found;
+}
+
+function sessionPair(response) {
+  const all = cookieHeaders(response);
+  for (let i = 0; i < all.length; i += 1) {
+    if (all[i].indexOf('mf_session=') === 0 && all[i].indexOf('Max-Age=0') === -1) {
+      return all[i].split(';')[0];
+    }
+  }
+  return '';
+}
+
+function hasSessionCookie(response) {
+  return sessionPair(response).indexOf('mf_session=') === 0;
+}
+
+function cookieFlags(value) {
+  return Boolean(value)
+    && value.indexOf('HttpOnly') !== -1
+    && value.indexOf('Secure') !== -1
+    && value.indexOf('SameSite=Strict') !== -1
+    && value.indexOf('Path=/') !== -1;
+}
+
+function loginEvent(password, ip) {
+  return {
+    httpMethod: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded',
+      'x-forwarded-for': ip
+    },
+    body: querystring.stringify({ password: password })
+  };
+}
+
+function formBody(overrides) {
+  const fields = {
+    memorial_id: String(FULL_ROW.memorial_id),
+    first_name: FULL_ROW.first_name,
+    middle_name: FULL_ROW.middle_name,
+    maiden_name: FULL_ROW.maiden_name,
+    last_name: FULL_ROW.last_name,
+    suffix: FULL_ROW.suffix,
+    is_vet: FULL_ROW.is_vet,
+    birth_year: String(FULL_ROW.birth_year),
+    birth_month: FULL_ROW.birth_month,
+    birth_day: String(FULL_ROW.birth_day),
+    death_year: String(FULL_ROW.death_year),
+    death_month: FULL_ROW.death_month,
+    death_day: String(FULL_ROW.death_day),
+    section: FULL_ROW.section,
+    lot: String(FULL_ROW.lot)
+  };
+  return querystring.stringify(Object.assign(fields, overrides || {}));
+}
 
 async function main() {
   // --- 1. Wildcard escaping ----------------------------------------------
@@ -365,16 +472,31 @@ async function main() {
   check('the old split would have dropped _data on that name', legacySplit('honey_ford_data_formatted_2') === 'honey_ford');
   same('an unknown slug is not given a guessed table', baseRecord.baseTableForCemetery('not-a-cemetery'), null);
 
-  // The write path (updateRecord.js) was not part of this change. For every
-  // cemetery the site has, its split and this map still name the same table.
+  // The write path names its table with baseTableFor (baseRecord.js). The old
+  // split of the view name is gone: a null cemetery used to throw before the
+  // null check, and an unknown view must not be turned into a guessed table.
   const updateSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/updateRecord.js'), 'utf8');
-  check('the save path still derives its table with split', updateSource.indexOf('split("_", 2).join("_")') !== -1);
+  check('the save path names the table with baseTableFor', updateSource.indexOf('baseTableFor') !== -1);
+  check('the save path no longer splits the cemetery view', updateSource.indexOf('.split(') === -1);
+  check('the save path selects every column', updateSource.indexOf(".select('*')") !== -1);
+  check('the save path does not name a column in select', updateSource.indexOf("select('memorial_id'") === -1 && updateSource.indexOf('select("memorial_id"') === -1);
 
   const views = {
     bcmg_data_formatted_2: 'bcmg_data',
     capernaum_data_formatted_2: 'capernaum_data',
     honeyford_data_formatted_2: 'honeyford_data'
   };
+  adminSession.resetAuthStateForTests();
+  reset();
+  const setupLogin = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.10'), {});
+  const adminCookie = sessionPair(setupLogin);
+  const setupCookie = cookieHeaders(setupLogin).find(function (value) {
+    return value.indexOf('mf_session=') === 0;
+  });
+  check('login with the env password returns the update page', setupLogin.statusCode === 200 && setupLogin.body.indexOf('Update a grave record') !== -1 && setupLogin.body.indexOf('Admin login') === -1);
+  check('login does not query the database', calls.length === 0);
+  check('login sets a signed session cookie', adminCookie.indexOf('mf_session=') === 0 && adminCookie.indexOf('.') !== -1);
+  check('the session cookie is HttpOnly, Secure, SameSite=Strict, and expires', Boolean(setupCookie) && cookieFlags(setupCookie) && setupCookie.indexOf('Max-Age=600') !== -1);
   const viewNames = Object.keys(views);
   for (let i = 0; i < viewNames.length; i += 1) {
     const view = viewNames[i];
@@ -383,6 +505,7 @@ async function main() {
       view: view
     });
     const page = await getUpdateRecord.handler({
+      headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
       queryStringParameters: { memorial_id: '1000004' }
     }, {});
     const read = dataCalls()[0];
@@ -395,6 +518,207 @@ async function main() {
 
   const updateSourceHasLocalCopy = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/getUpdateRecord.js'), 'utf8').indexOf("split('_', 2)") !== -1;
   check('getUpdateRecord no longer has its own split', updateSourceHasLocalCopy === false);
+
+  // --- 4. Admin session and the save path --------------------------------
+  const loginSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/login.js'), 'utf8');
+  const authSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/adminSession.js'), 'utf8');
+  check('login no longer hard-codes the admin email', loginSource.indexOf('memorafind@gmail.com') === -1);
+  check('login no longer signs in through Supabase Auth', loginSource.indexOf('signInWithPassword') === -1 && loginSource.indexOf('@supabase/supabase-js') === -1);
+  check('password comparison is constant-time', authSource.indexOf('timingSafeEqual') !== -1);
+  check('the save does not forward the cookie as a bearer token', updateSource.indexOf('Authorization') === -1);
+
+  reset();
+  const wrong = await login.handler(loginEvent('not-the-password', '198.51.100.19'), {});
+  const failCookie = cookieHeaders(wrong).find(function (value) { return value.indexOf('mf_fail=') === 0; });
+  check('a wrong password is rejected', wrong.statusCode === 401 && wrong.body.indexOf('Login failed') !== -1);
+  check('a wrong password does not open a session', !hasSessionCookie(wrong) && calls.length === 0);
+  check('a wrong password sets a signed lockout cookie', Boolean(failCookie) && cookieFlags(failCookie) && failCookie.indexOf('.') !== -1 && failCookie.indexOf('Max-Age=0') === -1);
+
+  const probedIp = '198.51.100.18';
+  for (let n = 0; n < adminSession.FAILURE_LIMIT; n += 1) {
+    const probed = await login.handler({ httpMethod: 'GET', headers: { 'x-forwarded-for': probedIp } }, {});
+    check('a non-POST login does not start a session', probed.statusCode === 405 && !hasSessionCookie(probed));
+  }
+  const afterProbe = await login.handler(loginEvent(ADMIN_PASSWORD, probedIp), {});
+  check('probing the login URL does not lock the client out', afterProbe.statusCode === 200 && hasSessionCookie(afterProbe));
+
+  const belowLimit = '198.51.100.25';
+  for (let n = 0; n < adminSession.FAILURE_LIMIT - 1; n += 1) {
+    const attempt = await login.handler(loginEvent('nope', belowLimit), {});
+    check('failure ' + (n + 1) + ' below the limit is 401', attempt.statusCode === 401 && !hasSessionCookie(attempt));
+  }
+  const recovered = await login.handler(loginEvent(ADMIN_PASSWORD, belowLimit), {});
+  check('a correct password below the limit still signs in', recovered.statusCode === 200 && hasSessionCookie(recovered));
+
+  const lockedIp = '198.51.100.20';
+  for (let n = 0; n < adminSession.FAILURE_LIMIT - 1; n += 1) {
+    const attempt = await login.handler(loginEvent('nope', lockedIp), {});
+    check('lockout setup failure ' + (n + 1) + ' stays 401', attempt.statusCode === 401 && !hasSessionCookie(attempt));
+  }
+  const tripping = await login.handler(loginEvent('nope', lockedIp), {});
+  check('the failure that reaches the limit is locked out', tripping.statusCode === 429 && tripping.body.indexOf('Too many attempts') !== -1 && !hasSessionCookie(tripping));
+  const duringLock = await login.handler(loginEvent(ADMIN_PASSWORD, lockedIp), {});
+  check('the correct password is rejected during lockout', duringLock.statusCode === 429 && !hasSessionCookie(duringLock));
+  const otherClient = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.21'), {});
+  check('a different client is not locked out', otherClient.statusCode === 200 && hasSessionCookie(otherClient));
+
+  const salt = crypto.randomBytes(16);
+  const hashKey = crypto.scryptSync('hash-secret-password', salt, 32);
+  process.env.ADMIN_PASSWORD_HASH = 'scrypt:' + salt.toString('hex') + ':' + hashKey.toString('hex');
+  delete process.env.ADMIN_PASSWORD;
+  const hashed = await login.handler(loginEvent('hash-secret-password', '198.51.100.40'), {});
+  const hashedWrong = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.41'), {});
+  check('a scrypt hash signs in', hashed.statusCode === 200 && hasSessionCookie(hashed));
+  check('the plaintext env password is not accepted once a hash is set', hashedWrong.statusCode === 401 && !hasSessionCookie(hashedWrong));
+  process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD_HASH;
+
+  const openGate = await updatePage.handler({ headers: {} }, {});
+  check('update page without a session is the login page', openGate.statusCode === 200 && openGate.body.indexOf('Admin login') !== -1 && openGate.body.indexOf('Find a record') === -1);
+  const signedGate = await updatePage.handler({ headers: { cookie: adminCookie } }, {});
+  check('update page with a session is the edit gate', signedGate.statusCode === 200 && signedGate.body.indexOf('Find a record') !== -1);
+  const forgedCookie = adminCookie.slice(0, -1) + (adminCookie.slice(-1) === 'a' ? 'b' : 'a');
+  const forgedGate = await updatePage.handler({ headers: { cookie: forgedCookie } }, {});
+  check('a forged session cookie is rejected', forgedGate.statusCode === 200 && forgedGate.body.indexOf('Admin login') !== -1);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const anonymousLookup = await getUpdateRecord.handler({
+    headers: {},
+    queryStringParameters: { memorial_id: '1000004' }
+  }, {});
+  check('an anonymous lookup is rejected', anonymousLookup.statusCode === 401 && anonymousLookup.body.indexOf('Admin login') !== -1);
+  check('an anonymous lookup does not read the database', calls.length === 0);
+  check('an anonymous lookup does not render the record', anonymousLookup.body.indexOf('Wilhelmina') === -1);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const legacyLookup = await getUpdateRecord.handler({
+    headers: { cookie: 'token=supabase-access-token' },
+    queryStringParameters: { memorial_id: '1000004' }
+  }, {});
+  check('a legacy token cookie is not a session', legacyLookup.statusCode === 401 && calls.length === 0 && legacyLookup.body.indexOf('Wilhelmina') === -1);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const anonymousSave = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: {},
+    body: formBody({ last_name: 'Abell', notes: 'pwned' })
+  }, {});
+  check('an anonymous save is rejected', anonymousSave.statusCode === 401 && anonymousSave.body.indexOf('Admin login') !== -1 && anonymousSave.body.indexOf('updated successfully') === -1);
+  check('an anonymous save does not write', calls.length === 0);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const forgedSave = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: forgedCookie },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  check('a forged session cannot save', forgedSave.statusCode === 401 && calls.length === 0);
+
+  const saveViews = Object.keys(views);
+  for (let s = 0; s < saveViews.length; s += 1) {
+    const view = saveViews[s];
+    reset({ rows: [Object.assign({}, FULL_ROW)], view: view });
+    const saved = await updateRecord.handler({
+      httpMethod: 'POST',
+      headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+      body: formBody({
+        last_name: 'Abell',
+        notes: 'pwned',
+        prefix: 'Dr',
+        role: 'admin',
+        moved_from: 'somewhere else'
+      })
+    }, {});
+    const writes = calls.filter(function (call) { return call.update; });
+    const read = dataCalls().filter(function (call) { return !call.update; })[0];
+    check('save for ' + view + ' succeeds', saved.statusCode === 200 && saved.body.indexOf('Record 1000004 has been updated successfully.') !== -1);
+    same('save for ' + view + ' writes ' + views[view], writes[0] && writes[0].table, views[view]);
+    same('save for ' + view + ' writes only the changed allowlisted field', writes[0] && writes[0].update, { last_name: 'Abell' });
+    same('save for ' + view + ' reads with select *', read && read.select, '*');
+    same('save for ' + view + ' returns rows with select *', writes[0] && writes[0].select, '*');
+    check('save for ' + view + ' is a single write', writes.length === 1);
+  }
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const unchanged = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody()
+  }, {});
+  check('an unchanged form does not write', unchanged.statusCode === 200 && unchanged.body.indexOf('No fields were changed') !== -1 && calls.every(function (call) { return !call.update; }));
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const badBirthYear = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody({ birth_year: '99999' })
+  }, {});
+  check('a year outside the allowed range is rejected', badBirthYear.statusCode === 400 && badBirthYear.body.indexOf('not valid') !== -1 && calls.length === 0);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const badVet = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody({ is_vet: 'YES' })
+  }, {});
+  check('a veteran value the form cannot send is rejected', badVet.statusCode === 400 && calls.length === 0);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const duplicateName = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody() + '&first_name=Other'
+  }, {});
+  check('a repeated field is rejected', duplicateName.statusCode === 400 && calls.length === 0);
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2', updatedRows: [] });
+  const zeroRows = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  const zeroWrite = calls.filter(function (call) { return call.update; })[0];
+  check('a write that changes no row is not reported as saved', zeroRows.statusCode === 500 && zeroRows.body.indexOf('Nothing was saved') !== -1 && zeroRows.body.indexOf('updated successfully') === -1);
+  same('that write still asked for every column back', zeroWrite && zeroWrite.select, '*');
+
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: null });
+  const missingCemetery = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  check('a missing cemetery is reported and does not throw', missingCemetery.statusCode === 404 && missingCemetery.body.indexOf('not found') !== -1 && missingCemetery.body.indexOf('TypeError') === -1);
+  check('a missing cemetery does not write', calls.every(function (call) { return !call.update; }));
+  check('a missing cemetery is not described as a successful save', missingCemetery.body.indexOf('updated successfully') === -1);
+
+  const logoutLogin = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.30'), {});
+  const logoutCookie = sessionPair(logoutLogin);
+  const loggedOut = await logout.handler({ headers: { cookie: logoutCookie } }, {});
+  const cleared = cookieHeaders(loggedOut).find(function (value) { return value.indexOf('mf_session=') === 0; });
+  check('logout redirects home', loggedOut.statusCode === 302 && loggedOut.headers.Location === '/');
+  check('logout clears the session cookie with the same attributes', Boolean(cleared) && cookieFlags(cleared) && cleared.indexOf('Max-Age=0') !== -1);
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const reused = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: logoutCookie },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  check('a logged-out session cannot save', reused.statusCode === 401 && calls.length === 0);
+  reset({ rows: [Object.assign({}, FULL_ROW, { death_day: 12 })], view: 'bcmg_data_formatted_2' });
+  const stillSignedIn = await getUpdateRecord.handler({
+    headers: { cookie: adminCookie },
+    queryStringParameters: { memorial_id: '1000004' }
+  }, {});
+  check('logging out one session leaves another session valid', stillSignedIn.statusCode === 200 && stillSignedIn.body.indexOf('value="12"') !== -1);
+
+  const savedSecret = process.env.ADMIN_SESSION_SECRET;
+  delete process.env.ADMIN_SESSION_SECRET;
+  const unconfigured = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.70'), {});
+  check('login without a session secret fails closed', unconfigured.statusCode === 500 && !hasSessionCookie(unconfigured));
+  process.env.ADMIN_SESSION_SECRET = 'short';
+  const shortSecret = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.71'), {});
+  check('login with a short session secret fails closed', shortSecret.statusCode === 500 && !hasSessionCookie(shortSecret));
+  process.env.ADMIN_SESSION_SECRET = savedSecret;
 
   console.log(passed + ' checks passed');
   if (failures.length > 0) {
