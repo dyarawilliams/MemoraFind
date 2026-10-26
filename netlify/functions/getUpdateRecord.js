@@ -3,6 +3,7 @@ const ejs = require('ejs');
 const path = require('path');
 const { findCemetery } = require('./findCemetery');
 const { baseTableFor } = require('./baseRecord');
+const { requireAdmin } = require('./adminSession');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -37,13 +38,15 @@ async function renderUpdatePage(templateData) {
 
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'text/html' },
+    headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
     body: html
   };
 }
 
 //export function
 exports.handler = async function (event, context) {
+  const gate = await requireAdmin(event || {}, 401);
+  if (gate.response) return gate.response;
 
   const memorial_id = (event.queryStringParameters || {}).memorial_id;
 
@@ -52,16 +55,7 @@ exports.handler = async function (event, context) {
   // and render the update form with a message
 
   if (!memorial_id) {
-    templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
-    templateData = { record: null, message: 'Please enter a valid Memorial ID to search.' };
-
-    const html = await ejs.renderFile(templatePath, templateData);
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'text/html' },
-      body: html
-    };
+    return await renderUpdatePage({ record: null, message: 'Please enter a valid Memorial ID to search.' });
   }
 
   // A Memorial ID that is not a number cannot be looked up: the column is
@@ -93,7 +87,7 @@ exports.handler = async function (event, context) {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'text/html' },
+      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
       body: html
     };
   }
@@ -129,7 +123,7 @@ exports.handler = async function (event, context) {
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
         body: html
       };
     } else {
@@ -142,7 +136,7 @@ exports.handler = async function (event, context) {
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
         body: html
       };
     }

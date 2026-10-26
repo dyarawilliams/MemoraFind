@@ -1,65 +1,73 @@
-const { createClient } = require('@supabase/supabase-js');
 const ejs = require('ejs');
 const path = require('path');
-//Used to validate logged-in users
-const cookie = require('cookie');
-//Used to parse POST requests
 const querystring = require('querystring');
+const {
+  authConfigured,
+  verifyPassword,
+  identityOk,
+  isLocked,
+  registerFailure,
+  clearFailures,
+  failureCookieForCurrent,
+  establishSession,
+  renderLogin,
+  htmlResponse
+} = require('./adminSession');
 
+const LOGIN_FAILED = 'Login failed. Please try again or contact a library administrator.';
+const LOCKED_OUT = 'Too many attempts. Please wait 15 minutes and try again.';
 
-//initialize connection to Supabase
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
+function postedIdentity(parsed) {
+  const value = parsed.username || parsed.email || '';
+  if (Array.isArray(value)) return value.join(',');
+  return String(value || '');
+}
 
-//Export Function
-exports.handler = async function (event, context) {
-
-  //Get login information from POST request - using querystring because we aren't passing login info in the URL
-  const { username, password } = querystring.parse(event.body);
-
-  //Use Supabase's built-in authentication to log in and permit write access to the DB. Also provides a token to use later.
-  // This is the single Supabase account the site signs in as; the address is deliberately in the code.
-  let { data, error } = await supabase.auth.signInWithPassword({
-    email: 'memorafind@gmail.com',
-    password: password,
-  });
-
-  //If wrong password, reload login and tell the user.
-  if (error) {
-    console.error('Login error', error.message);
-    const templatePath = path.resolve(__dirname, '../../public/views/login.ejs');
-    const html = await ejs.renderFile(templatePath, { message: 'Login failed. Please try again or contact a library administrator.' });
-
-    return {
-      statusCode: 401,
-      headers: { 'Content-Type': 'text/html' },
-      body: html
-    };
+async function handleLogin(event) {
+  if (event.httpMethod && event.httpMethod !== 'POST') {
+    return renderLogin(null, 405);
   }
 
-  //Grab the token from the data passed back from Supabase on successful login
-  const token = data.session.access_token;
+  if (!authConfigured()) {
+    console.error('Admin login is not configured. Set ADMIN_EMAIL, ADMIN_SESSION_SECRET (16+ characters), and ADMIN_PASSWORD or ADMIN_PASSWORD_HASH.');
+    return renderLogin(LOGIN_FAILED, 500);
+  }
 
-  //Add the token to the header for use in the Update functions
-  const headers = {
-    'Set-Cookie': cookie.serialize('token', token, {
-      httpOnly: true,
-      maxAge: 600, // 10 minute timer before expiration
-      sameSite: 'strict',
-      path: '/'
-    })
-  };
+  if (isLocked(event)) {
+    return renderLogin(LOCKED_OUT, 429, [failureCookieForCurrent(event)]);
+  }
 
-  //Let the user pass through to the Update page
+  const parsed = querystring.parse(event.body || '');
+  const password = typeof parsed.password === 'string' ? parsed.password : '';
+  // Always check both so a wrong identity does not skip the password work.
+  const emailOk = identityOk(postedIdentity(parsed));
+  const passwordOk = await verifyPassword(password);
+
+  if (!emailOk || !passwordOk) {
+    const failure = registerFailure(event);
+    return renderLogin(failure.locked ? LOCKED_OUT : LOGIN_FAILED, failure.locked ? 429 : 401, [failure.cookie]);
+  }
+
+  const issued = establishSession();
+  if (!issued) {
+    console.error('Admin session could not be signed.');
+    return renderLogin(LOGIN_FAILED, 500);
+  }
+
   const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
   const html = await ejs.renderFile(templatePath, { record: null, message: null });
+  return htmlResponse(200, html, [issued.cookie, clearFailures(event)]);
+}
 
-  //Return the Update page as as HTML, plus the additional Session information and token.
-  return {
-    statusCode: 200,
-    headers: {
-      ...headers,
-      'Content-Type': 'text/html'
-    },
-    body: html
-  };
+exports.handler = async function (event) {
+  try {
+    return await handleLogin(event || {});
+  } catch (error) {
+    console.error('Login failed', error && error.message);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
+      body: 'Internal Server Error'
+    };
+  }
 };

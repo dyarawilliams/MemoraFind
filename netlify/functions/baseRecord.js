@@ -42,14 +42,14 @@ const VIEW_SUFFIX = '_data_formatted_2';
 //view; a search names the cemetery by its slug. Both have to reach the same
 //base table.
 //
-//This used to be `String(view).split('_', 2).join('_')`, the same expression
-//updateRecord.js still uses when it writes. That split is right for every
-//cemetery this site has — "bcmg_data_formatted_2" becomes "bcmg_data" — only
-//because none of the three codes contains an underscore. The second piece of
-//the split is the word "data", and a code that itself contained an underscore
-//("honey_ford_data_formatted_2") would be read as the table "honey_ford",
-//dropping "_data". The map below names the table directly. A view or a slug
-//that is not one of these three is not given a guessed name.
+//This used to be `String(view).split('_', 2).join('_')`. updateRecord.js now
+//calls baseTableFor for the write, the same map as the read. That split is
+//right for every cemetery this site has — "bcmg_data_formatted_2" becomes
+//"bcmg_data" — only because none of the three codes contains an underscore.
+//The second piece of the split is the word "data", and a code that itself
+//contained an underscore ("honey_ford_data_formatted_2") would be read as the
+//table "honey_ford", dropping "_data". The map below names the table directly.
+//A view or a slug that is not one of these three is not given a guessed name.
 const CEMETERY_TABLES = {
   bcmg: { view: 'bcmg_data_formatted_2', table: 'bcmg_data' },
   capernaum: { view: 'capernaum_data_formatted_2', table: 'capernaum_data' },
