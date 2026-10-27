@@ -101,6 +101,134 @@ class RecordNotFoundError extends Error {
   }
 }
 
+class AdminSignInError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'AdminSignInError';
+  }
+}
+
+// The three base tables allow UPDATE for the authenticated Supabase user.
+// A write with the anon key alone is accepted and changes zero rows, which
+// the page used to report as "Nothing was saved". The mf_session cookie still
+// gates the admin pages. This sign-in is a separate Supabase Auth session,
+// used only for the update, and it never leaves the function: not a cookie,
+// not the response, and not the log.
+const AUTH_EXPIRY_MARGIN_MS = 60 * 1000;
+
+let cachedAdmin = null;
+
+function supabaseAdminPassword() {
+  const dedicated = process.env.SUPABASE_ADMIN_PASSWORD;
+  if (typeof dedicated === 'string' && dedicated.length > 0) return dedicated;
+  return process.env.ADMIN_PASSWORD || '';
+}
+
+function expiryMs(session) {
+  const expiresAt = session && Number(session.expires_at);
+  if (expiresAt && !isNaN(expiresAt)) return expiresAt * 1000;
+  const lifetime = session && Number(session.expires_in);
+  const seconds = lifetime && !isNaN(lifetime) ? lifetime : 3600;
+  return Date.now() + seconds * 1000;
+}
+
+function cacheIsFresh() {
+  if (!cachedAdmin || !cachedAdmin.client || !cachedAdmin.expiresAtMs) return false;
+  return cachedAdmin.expiresAtMs - Date.now() > AUTH_EXPIRY_MARGIN_MS;
+}
+
+function failSignIn() {
+  console.error('Supabase admin sign-in failed');
+  throw new AdminSignInError('Supabase admin sign-in failed');
+}
+
+async function signInAdminClient() {
+  const email = String(process.env.ADMIN_EMAIL || '').trim();
+  const password = supabaseAdminPassword();
+  if (!email || !password) failSignIn();
+
+  const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  });
+
+  let result;
+  try {
+    result = await client.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+  } catch (error) {
+    // Do not log `error`. A rejected request can include the password.
+    failSignIn();
+  }
+
+  const session = result && result.data && result.data.session;
+  if (!result || result.error || !session || !session.access_token) failSignIn();
+
+  cachedAdmin = {
+    client: client,
+    expiresAtMs: expiryMs(session)
+  };
+  return client;
+}
+
+async function refreshCachedAdmin() {
+  if (!cachedAdmin || !cachedAdmin.client || !cachedAdmin.client.auth) return false;
+  let refreshed;
+  try {
+    refreshed = await cachedAdmin.client.auth.refreshSession();
+  } catch (error) {
+    return false;
+  }
+  const session = refreshed && refreshed.data && refreshed.data.session;
+  if (!refreshed || refreshed.error || !session || !session.access_token) return false;
+  cachedAdmin.expiresAtMs = expiryMs(session);
+  return cacheIsFresh();
+}
+
+async function adminClientForSave() {
+  if (cacheIsFresh()) return cachedAdmin.client;
+  if (cachedAdmin && cachedAdmin.client) {
+    const refreshed = await refreshCachedAdmin();
+    if (refreshed) return cachedAdmin.client;
+    cachedAdmin = null;
+  }
+  return signInAdminClient();
+}
+
+async function replaceAdminClient() {
+  if (cachedAdmin && cachedAdmin.client) {
+    const refreshed = await refreshCachedAdmin();
+    if (refreshed) return cachedAdmin.client;
+  }
+  cachedAdmin = null;
+  return signInAdminClient();
+}
+
+function isUnauthorized(error, status) {
+  if (status === 401) return true;
+  if (!error) return false;
+  if (error.status === 401) return true;
+  if (String(error.code || '') === 'PGRST301') return true;
+  return /jwt expired|invalid jwt/i.test(String(error.message || ''));
+}
+
+async function authedQuery(run) {
+  const client = await adminClientForSave();
+  const first = await run(client);
+  if (!isUnauthorized(first && first.error, first && first.status)) return first;
+  const recovered = await replaceAdminClient();
+  return run(recovered);
+}
+
+function resetAdminAuthForTests() {
+  cachedAdmin = null;
+}
+
 function invalidText(value, max) {
   if (value.length > max) return true;
   return /[\u0000-\u001F\u007F<>]/.test(value);
@@ -160,7 +288,7 @@ function editableUpdates(formData) {
   return { error: false, updates: updates };
 }
 
-async function updateRecordInSupabase(supabase, formData) {
+async function updateRecordInSupabase(formData) {
   const memorialId = typeof formData.memorial_id === 'string' ? formData.memorial_id.trim() : '';
   if (!MEMORIAL_ID_PATTERN.test(memorialId)) {
     throw new FieldValidationError('A Memorial ID is a number. The record was not saved.');
@@ -185,7 +313,10 @@ async function updateRecordInSupabase(supabase, formData) {
       throw new Error('Invalid table name');
     }
 
-    const { data: currentData, error: fetchError } = await supabase
+    // The comparison read stays on the anon key. Those selects already
+    // succeed; the edit form does too. Signing in is for the write.
+    const reader = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
+    const { data: currentData, error: fetchError } = await reader
       .from(tableName)
       .select('*')
       .eq('memorial_id', memorialId)
@@ -217,11 +348,17 @@ async function updateRecordInSupabase(supabase, formData) {
     // Supabase reports that as no error and zero rows — could not be told
     // apart from a real save. select('*') is the whole row: a named column
     // list is what previously rejected reads when a column was absent.
-    const { data: updatedRows, error: updateError } = await supabase
-      .from(tableName)
-      .update(updatePayload)
-      .eq('memorial_id', memorialId)
-      .select('*');
+    // This query runs as the signed-in Supabase user. A zero-row result
+    // after that sign-in is still "nothing was saved", not a failed sign-in.
+    const updated = await authedQuery(function (client) {
+      return client
+        .from(tableName)
+        .update(updatePayload)
+        .eq('memorial_id', memorialId)
+        .select('*');
+    });
+    const updatedRows = updated && updated.data;
+    const updateError = updated && updated.error;
 
     if (updateError) {
       console.error('Error updating record:', updateError);
@@ -234,7 +371,7 @@ async function updateRecordInSupabase(supabase, formData) {
 
     return { fieldsChanged: true, data: updatedRows, memorialId: memorialId };
   } catch (error) {
-    if (!error || (error.name !== 'RecordNotFoundError' && error.name !== 'NothingSavedError')) {
+    if (!error || (error.name !== 'RecordNotFoundError' && error.name !== 'NothingSavedError' && error.name !== 'AdminSignInError')) {
       console.error('Error updating record in Supabase:', error);
     }
     throw error;
@@ -264,10 +401,9 @@ exports.handler = async function (event) {
   }
 
   const formData = querystring.parse(event.body || '');
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
 
   try {
-    const result = await updateRecordInSupabase(supabase, formData);
+    const result = await updateRecordInSupabase(formData);
     if (result && result.fieldsChanged === false) {
       return renderUpdate('No fields were changed, so the record was left as it is.', 200);
     }
@@ -286,7 +422,13 @@ exports.handler = async function (event) {
       return renderUpdate('Nothing was saved. The database did not change this record. Please check the record is still there, and tell a library administrator if this happens again.', 500);
     }
 
+    if (error && error.name === 'AdminSignInError') {
+      return renderUpdate('Error Updating Record. Please try again.', 500);
+    }
+
     console.error('Error updating record:', error && error.message ? error.message : error);
     return renderUpdate('Error Updating Record. Please try again.', 500);
   }
 };
+
+exports.resetAdminAuthForTests = resetAdminAuthForTests;
