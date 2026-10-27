@@ -200,6 +200,10 @@
     color: #fff;
 }
 
+.site-nav__list a[aria-current="page"] {
+    border-left-color: var(--gold);
+}
+
 .site-nav__admin {
     color: var(--gold-soft);
 }
@@ -236,6 +240,11 @@
 
     .site-nav__list a:hover,
     .site-nav__list a:focus-visible {
+        border-left-color: transparent;
+        border-bottom-color: var(--gold);
+    }
+
+    .site-nav__list a[aria-current="page"] {
         border-left-color: transparent;
         border-bottom-color: var(--gold);
     }
@@ -301,7 +310,8 @@
 }
 
 .site-footer a:hover,
-.site-footer a:focus-visible {
+.site-footer a:focus-visible,
+.site-footer a[aria-current="page"] {
     color: #fff;
     text-decoration-color: #fff;
 }
@@ -519,6 +529,7 @@
     }
 }
 
+.panel h1,
 .panel h2,
 .panel h3 {
     margin-bottom: var(--sp-2);

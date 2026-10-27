@@ -1,0 +1,30 @@
+<%- include('partials/header.ejs', {
+      pageTitle: 'Contact Us — MemoraFind',
+      pageDescription: 'Contact MemoraFind about a Bamberg County burial record, a correction, or the site.',
+      canonicalPath: '/contact',
+      currentNav: 'contact'
+    }) %>
+
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li aria-current="page">Contact Us</li>
+                    </ol>
+                </nav>
+
+                <div class="panel">
+                    <h1>Contact Us</h1>
+                    <p class="panel__intro">
+                        Questions about a burial record, a correction, or MemoraFind itself
+                        are welcome. Write to us and a person will read it.
+                    </p>
+                    <p>
+                        <a href="mailto:memorafind@gmail.com">memorafind@gmail.com</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs', { currentNav: 'contact' }) %>
