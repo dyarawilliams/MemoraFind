@@ -24,6 +24,7 @@ const crypto = require('crypto');
 const querystring = require('querystring');
 
 const ADMIN_PASSWORD = 'correct-horse-battery';
+const TEST_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.test';
 
 const failures = [];
 let passed = 0;
@@ -174,7 +175,7 @@ Module._load = function (request, parent, isMain) {
 
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost';
 process.env.SUPABASE_API_KEY = process.env.SUPABASE_API_KEY || 'test-key';
-process.env.ADMIN_EMAIL = 'admin@memorafind.test';
+process.env.ADMIN_EMAIL = TEST_ADMIN_EMAIL;
 process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
 process.env.ADMIN_SESSION_SECRET = 'test-session-secret-0123456789';
 delete process.env.ADMIN_PASSWORD_HASH;
@@ -522,7 +523,7 @@ async function main() {
   // --- 4. Admin session and the save path --------------------------------
   const loginSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/login.js'), 'utf8');
   const authSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/adminSession.js'), 'utf8');
-  check('login no longer hard-codes the admin email', loginSource.indexOf('memorafind@gmail.com') === -1);
+  check('login no longer hard-codes the admin email', loginSource.indexOf(TEST_ADMIN_EMAIL) === -1);
   check('login no longer signs in through Supabase Auth', loginSource.indexOf('signInWithPassword') === -1 && loginSource.indexOf('@supabase/supabase-js') === -1);
   check('password comparison is constant-time', authSource.indexOf('timingSafeEqual') !== -1);
   check('the save does not forward the cookie as a bearer token', updateSource.indexOf('Authorization') === -1);
