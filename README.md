@@ -54,7 +54,7 @@ More features and enhancements are on the way — because every memory matters.
 
 The site is live and searchable at **https://memorafind.com** (the `memorafind.netlify.app` address serves the same site, and `www` redirects to the apex `memorafind.com`). The interface described under [Design](#design) below is the site's design: it is merged and deployed, not a branch waiting on review.
 
-Everything a visitor can reach works. All three cemeteries search once a name or a year is entered; a cemetery page with no filter lists nothing and runs no query. Every record has a page at `/grave/<record id>` linked from its search result; the administrator's update route resolves at `/search/update`; an unknown cemetery or an unknown record gets a real page in the site's own design rather than a bare line of text.
+Everything a visitor can reach works, including the Contact Us page at `/contact`, which shows the public address memorafind@gmail.com. All three cemeteries search once a name or a year is entered; a cemetery page with no filter lists nothing and runs no query. Every record has a page at `/grave/<record id>` linked from its search result; the administrator's update route resolves at `/search/update`; an unknown cemetery or an unknown record gets a real page in the site's own design rather than a bare line of text.
 
 The burial location is still the gap the source data cannot close: section and lot are missing for almost every record, and the pages say that rather than guessing. Photos, biographies and family connections remain open decisions rather than unfinished code — see [Known Issues and What Is Not Built Yet](#known-issues-and-what-is-not-built-yet).
 
@@ -84,14 +84,14 @@ The stylesheets keep to one accessibility rule: **gold is never body or link tex
 
 MemoraFind runs on Node.js, EJS, Netlify Functions and Supabase. That stack is fixed: there is no framework migration, no bundler and no build step.
 
-* **Pages — `public/views/`.** Every page is an EJS template: `index.ejs` (the landing page), `search.ejs` (a cemetery's results), `grave.ejs` (one record), `update.ejs` (the administrator's lookup and edit form), `login.ejs` (the administrator login), and three states that used to be plain text — `cemetery-not-found.ejs`, `grave-not-found.ejs` and `grave-unavailable.ejs`.
+* **Pages — `public/views/`.** Every page is an EJS template: `index.ejs` (the landing page), `contact.ejs` (Contact Us; the page shows the public address memorafind@gmail.com), `search.ejs` (a cemetery's results), `grave.ejs` (one record), `update.ejs` (the administrator's lookup and edit form), `login.ejs` (the administrator login), and three states that used to be plain text — `cemetery-not-found.ejs`, `grave-not-found.ejs` and `grave-unavailable.ejs`.
 * **Shared partials — `public/views/partials/`.** `header.ejs` (document head plus site header and navigation), `footer.ejs` (footer and the small mobile-navigation script), `search-fields.ejs` (the reusable search form fields), `record-display.ejs` (the date, "Not recorded" and age rules, shared by the search card and the record page so the two cannot drift) and `fact-burial-location.ejs` (the burial-location fact, shared by the same two templates for the same reason).
-* **Server code — `netlify/functions/`.** One file per route. Each handler does its work and returns HTML rendered with `ejs.renderFile`. `findCemetery.js` is a shared helper that locates a record by Memorial ID across the three cemeteries — it is not a route. `baseRecord.js` is the other shared helper: it names each cemetery's base table and composes the date string the templates read.
+* **Server code — `netlify/functions/`.** One file per route. Each handler does its work and returns HTML rendered with `ejs.renderFile`. The route handlers are `renderIndex.js`, `renderContact.js` (Contact Us, from `public/views/contact.ejs`), `renderSearch.js`, `renderGrave.js`, `getUpdateRecord.js`, `updatePage.js`, `updateRecord.js`, `login.js` and `logout.js`. `findCemetery.js` is a shared helper that locates a record by Memorial ID across the three cemeteries — it is not a route. `baseRecord.js` is the other shared helper: it names each cemetery's base table and composes the date string the templates read. `adminSession.js` holds the signed session and lockout, and is not a route.
 * **Data — Supabase.** The burial records live in Supabase. The functions read the project URL and key from the environment. Administrator sign-in is a signed session checked in the functions (see [Environment Variables](#environment-variables)).
 * **Records pipeline — `python-scraper/`.** A Python script using BeautifulSoup that parses the cemetery listing pages into the CSV files committed alongside it (`parsed_names_bcmg.csv`, `parsed_names_capernaum.csv`, `parsed_names_honeyford.csv`), which is where the records in the database came from. What the source pages do and do not contain is what decides what the site can show — see the burial-location issue below.
 * **Static assets — `public/`.** Stylesheets are served from `/css/...` and the cemetery photographs from `/assets/...`. `public/robots.txt` allows normal crawling and disallows `/.netlify/` (the function endpoints answer any caller, so they are kept out of the index), and `public/sitemap.xml` lists the landing page, the three cemetery search pages and **all 2,428 grave pages** (`/grave/<memorial id>`), so every person's page can be found by a search engine now that a cemetery search page lists nothing until a visitor searches. The sitemap is generated from the record CSVs, never edited by hand: run `node tools/build-sitemap.js` after the records change and commit the result (`node tools/build-sitemap.js --check` reports a stale file, and refuses to build at all if the CSVs no longer hold the 2,428 IDs 1000001–1002428 it expects).
 * **Contributor rules — `AGENTS.md`.** The short list of rules at the repository root: the frozen search form contract, the colour rule, "no invented data", and the fact that `netlify.toml` and the Supabase queries are changed only deliberately, with the owner's clearance.
-* **No build step — `netlify.toml`.** Netlify publishes `public/` exactly as it is committed and runs the functions from `netlify/functions/`. `[functions] included_files = ["public/views/**"]` is what ships the EJS templates together with the functions, so every template has to stay under `public/views/`. There is nothing to compile. The only generated files are `public/404.html` and `public/sitemap.xml`, both committed from the tools in `tools/` (`build-404.js`, `build-sitemap.js`) — nothing generates them during a deploy, so they have to be regenerated and committed when what they are built from changes.
+* **No build step — `netlify.toml`.** Netlify publishes `public/` exactly as it is committed and runs the functions from `netlify/functions/`. `[functions] included_files = ["public/views/**"]` is what ships the EJS templates together with the functions, so every template has to stay under `public/views/`. There is nothing to compile. The only generated files are `public/404.html` and `public/sitemap.xml`, both committed from the tools in `tools/` (`build-404.js`, `build-sitemap.js`) — nothing generates them during a deploy, so they have to be regenerated and committed when what they are built from changes. `[build.environment]` sets `SECRETS_SCAN_OMIT_KEYS = "ADMIN_EMAIL"` because the administrator email is intentionally public on the Contact Us page (memorafind@gmail.com, the same value as `ADMIN_EMAIL`). Netlify's secret scan would otherwise fail the build when it sees that address in the template. Scanning itself stays on; only that key is omitted.
 
 **[Back to top](#table-of-contents)**
 
@@ -102,6 +102,7 @@ Pretty URLs are Netlify redirects in `netlify.toml`, all with `status = 200`, so
 | Route | Function | Template | What it renders |
 | --- | --- | --- | --- |
 | `/` | `renderIndex` | `public/views/index.ejs` | the landing page: the quick search form, the three cemetery cards, the explanation of the update process, and the links to the three cemeteries |
+| `/contact` | `renderContact` | `public/views/contact.ejs` | the Contact Us page, which shows the public address memorafind@gmail.com |
 | `/search/:cemetery` | `renderSearch` | `public/views/search.ejs` | the results for one cemetery. `:cemetery` must be `bcmg` (Bamberg County Memory Gardens), `capernaum` or `honeyford`; any other value is answered with the site's own "Cemetery not found" page and a `404` status |
 | `/grave/<record id>` | `renderGrave` | `public/views/grave.ejs` | one person's record — see [The Single-Record Page](#the-single-record-page) |
 | `/search/update` | `getUpdateRecord` | `public/views/update.ejs` | the administrator's lookup-and-edit page — see [The Record-Update Flow](#the-record-update-flow) |
@@ -184,17 +185,17 @@ git clone git@github.com:dyarawilliams/MemoraFind.git
 
 ### Environment Variables
 
-Set these in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). None of the values are recorded in this repository. Public search needs the two Supabase variables. Administrator sign-in also needs the admin variables below — without them, login fails closed and no session cookie is issued. A save also needs `ADMIN_EMAIL` to be that user's address in Supabase Auth, and `SUPABASE_ADMIN_PASSWORD` when the Supabase password is not the same as `ADMIN_PASSWORD`.
+Set these in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). None of the values are recorded in this repository. Public search needs the two Supabase variables. Administrator sign-in also needs `ADMIN_EMAIL`, `ADMIN_SESSION_SECRET` (16 or more characters) and either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` — without them, login fails closed and no session cookie is issued. A save signs in to Supabase Auth as `ADMIN_EMAIL`. `SUPABASE_ADMIN_PASSWORD` is optional: the save uses it when it is set, and falls back to `ADMIN_PASSWORD` when it is unset or empty.
 
 | Variable | Purpose |
 | --- | --- |
 | `SUPABASE_URL` | the Supabase project URL the functions query |
 | `SUPABASE_API_KEY` | the anon key the functions use to read records. The save path starts a Supabase client with this key and then signs in; row-level security does not allow this key to update the tables |
-| `ADMIN_EMAIL` | must be the Supabase Auth user's email. The login form posts a password only; this address is not typed in. The signed session stores it, and the save path signs in to Supabase Auth with it |
-| `ADMIN_PASSWORD` | the site administrator password, compared in constant time. Ignored for site login when `ADMIN_PASSWORD_HASH` is set. Used as the Supabase Auth password only when `SUPABASE_ADMIN_PASSWORD` is unset |
+| `ADMIN_EMAIL` | must be the Supabase Auth user's email. The login form posts a password only; this address is not typed in. The signed session stores it, and the save path signs in to Supabase Auth with it. The Contact Us page publishes the same address (memorafind@gmail.com). `netlify.toml` sets `SECRETS_SCAN_OMIT_KEYS = "ADMIN_EMAIL"` so Netlify's secret scan does not fail the build on that public address |
+| `ADMIN_PASSWORD` | the site administrator password, compared in constant time. Ignored for site login when `ADMIN_PASSWORD_HASH` is set. Used as the Supabase Auth password when `SUPABASE_ADMIN_PASSWORD` is unset or empty |
 | `ADMIN_PASSWORD_HASH` | preferred over `ADMIN_PASSWORD` for site login. A scrypt hash in the form `scrypt:<salt hex>:<key hex>`. This does not replace `SUPABASE_ADMIN_PASSWORD` |
-| `SUPABASE_ADMIN_PASSWORD` | that Supabase Auth user's password. It can differ from the site `ADMIN_PASSWORD`. The save path signs in with this when it is set |
-| `ADMIN_SESSION_SECRET` | HMAC secret for the session cookie and the lockout cookie. At least 16 characters, random |
+| `SUPABASE_ADMIN_PASSWORD` | optional. That Supabase Auth user's password, when it differs from the site `ADMIN_PASSWORD`. The save path signs in with this when it is set, and falls back to `ADMIN_PASSWORD` when it is unset or empty |
+| `ADMIN_SESSION_SECRET` | HMAC secret for the session cookie and the lockout cookie. 16 or more characters, random |
 
 Generate `ADMIN_PASSWORD_HASH` with Node's built-in scrypt (the same defaults the login check uses):
 
@@ -206,9 +207,52 @@ node -e "const c=require('crypto');const p=process.argv[1];const s=c.randomBytes
 
 **Lockout.** Five failed attempts lock the client out for 15 minutes. The counter is kept in function memory (per client address, in that isolate) and in a signed `mf_fail` cookie, and the stricter of the two wins. This is best-effort on serverless: a new isolate starts with an empty memory counter, and a caller that drops the cookie avoids the copy it was holding. No Supabase table was added, so lockout does not need a schema change.
 
-**Saves and row-level security.** `bcmg_data`, `capernaum_data` and `honeyford_data` permit `UPDATE` for the authenticated Supabase user. The anon key in `SUPABASE_API_KEY` can read, and a write with that key alone changes zero rows. `updateRecord` still requires the signed `mf_session` cookie before it does anything. On the server it then signs in to Supabase Auth with `ADMIN_EMAIL` and `SUPABASE_ADMIN_PASSWORD` (falling back to `ADMIN_PASSWORD` when `SUPABASE_ADMIN_PASSWORD` is unset), using `supabase.auth.signInWithPassword` on a fresh client created with `persistSession: false`. The update and the `select('*')` that returns the changed row run as that user. The access token stays in the function isolate until it is near expiry; a write that comes back unauthorized refreshes the session or signs in again. The token is never written to a cookie, the response, or the log. If sign-in fails, the function log says `Supabase admin sign-in failed` and the page shows "Error Updating Record. Please try again." A write that changes zero rows is a different failure: the page says nothing was saved. Reads — the edit form, search, and the record page — still use `SUPABASE_API_KEY` alone, because those selects are allowed without a user session.
+**Saves and row-level security.** Row-level security is enabled on `bcmg_data`, `capernaum_data` and `honeyford_data`. The anon key in `SUPABASE_API_KEY` can read, and a write with that key alone changes zero rows. With row-level security on, a save that has no matching policy silently changes nothing: the update is accepted and zero rows are written. `updateRecord` still requires the signed `mf_session` cookie before it does anything. On the server it then signs in to Supabase Auth as `ADMIN_EMAIL`, using `SUPABASE_ADMIN_PASSWORD` when that optional variable is set and falling back to `ADMIN_PASSWORD` when it is unset or empty, with `supabase.auth.signInWithPassword` on a fresh client created with `persistSession: false`. The update and the `select('*')` that returns the changed row run as that user. The access token stays in the function isolate until it is near expiry; a write that comes back unauthorized refreshes the session or signs in again. The token is never written to a cookie, the response, or the log. If sign-in fails, the function log says `Supabase admin sign-in failed` and the page shows "Error Updating Record. Please try again." A write that changes zero rows is a different failure: the page says nothing was saved. Reads — the edit form, search, and the record page — still use `SUPABASE_API_KEY` alone, because those selects are allowed without a user session. Administrator saves through this path are confirmed working in production.
 
-The policies below are what has to allow that authenticated user to `UPDATE` and `SELECT` the three tables:
+Each table needs a `SELECT` policy named `Admin can read <table>` and an `UPDATE` policy named `Admin can update <table>`, both for the `authenticated` role. The `using` expression, and `with check` on the update policy, compare `auth.jwt()->>'email'` to the administrator's address. The statements below use the placeholder `your-admin@example.com`. Substitute the address stored in `ADMIN_EMAIL` when you run them. Do not commit that address.
+
+```sql
+create policy "Admin can read bcmg_data"
+  on public.bcmg_data
+  for select
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com');
+
+create policy "Admin can update bcmg_data"
+  on public.bcmg_data
+  for update
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com')
+  with check (auth.jwt()->>'email' = 'your-admin@example.com');
+
+create policy "Admin can read capernaum_data"
+  on public.capernaum_data
+  for select
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com');
+
+create policy "Admin can update capernaum_data"
+  on public.capernaum_data
+  for update
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com')
+  with check (auth.jwt()->>'email' = 'your-admin@example.com');
+
+create policy "Admin can read honeyford_data"
+  on public.honeyford_data
+  for select
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com');
+
+create policy "Admin can update honeyford_data"
+  on public.honeyford_data
+  for update
+  to authenticated
+  using (auth.jwt()->>'email' = 'your-admin@example.com')
+  with check (auth.jwt()->>'email' = 'your-admin@example.com');
+```
+
+These two queries check the policies and the table grants that are already in place:
 
 ```sql
 select tablename, policyname, cmd, roles, qual, with_check
@@ -238,12 +282,14 @@ Deployment is done by Netlify from this repository. `netlify.toml` publishes `pu
 ## Known Issues and What Is Not Built Yet
 
 * **The burial location is missing from the source data.** Every record renders "Section and lot not recorded", and that is the honest answer: 2,425 of the 2,428 records have no section or lot at all, and the three that show a value show a wrong one that our own pattern-matching invented from unrelated words on the source page ("Section BAMBERG", "Section MARKER", "Section 2011"). The scraper reads Find a Grave's "Plot info" line, which for these three cemeteries contains only `bamberg county memory` or `Marker only` — so re-scraping would not produce a location. Until the plots are collected by hand (walking the cemeteries or working from photographs) or come from the cemeteries or the county library, the site cannot say where a grave is. The page never guesses: where a record does carry a section or lot it is shown, and otherwise the fact says it was not recorded.
-* **The administrator save path has not been exercised against the live database.** The handlers are checked with a stub database (`node tools/verify-review-fixes.js`), including login, lockout, logout, a rejected anonymous save, the field allowlist, a missing cemetery, a Supabase sign-in that supplies the access token for the update, and a Supabase sign-in that fails. A real save still has to be confirmed on a deploy preview once Netlify has `ADMIN_EMAIL` set to the Supabase Auth user's email and `SUPABASE_ADMIN_PASSWORD` set to that user's Supabase password. That password can differ from `ADMIN_PASSWORD`.
+* **Administrator saves are confirmed working in production.** A save signs in to Supabase Auth as `ADMIN_EMAIL`, using `SUPABASE_ADMIN_PASSWORD` when that optional variable is set and falling back to `ADMIN_PASSWORD` when it is unset or empty. The handlers are also checked with a stub database (`node tools/verify-review-fixes.js`), including login, lockout, logout, a rejected anonymous save, the field allowlist, a missing cemetery, a Supabase sign-in that supplies the access token for the update, and a Supabase sign-in that fails.
 * **Photos, biographies and family connections are not built.** No photograph, biography or family relationship is stored in or read from the data, and none of them appear in the interface. They need new data structures in the Supabase project and a decision on who moderates a stranger's contribution to someone's memorial before any of it can start. The nearest the site comes today is the free-text `notes` and the `moved_from` / `moved_to` relocation fields, which a search card and a record page show under "More details" when the record actually carries one.
 
 **[Back to top](#table-of-contents)**
 
 ## How to Get Help
+
+Site visitors can use the Contact Us page at [/contact](https://memorafind.com/contact) or email memorafind@gmail.com.
 
 Contact me at dyara.williams@gmail.com for help with this project.
 
