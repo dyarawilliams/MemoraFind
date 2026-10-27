@@ -245,9 +245,19 @@
                         <ul class="records">
                             <% rows.forEach(function (record) { %>
                                 <%
+                                  /* Same order as the grave-page heading: given names, maiden
+                                     name, surname, then ", suffix" only when a suffix was
+                                     recorded. A comma belongs to the suffix, so a name with
+                                     no suffix does not end in one. */
+                                  function recordedText(value) {
+                                      return (value === null || value === undefined) ? "" : String(value).trim();
+                                  }
                                   var givenNames = [record.first_name, record.middle_name]
-                                      .filter(function (part) { return part && String(part).trim() !== ""; })
+                                      .filter(function (part) { return recordedText(part) !== ""; })
                                       .join(" ");
+                                  var maidenName = recordedText(record.maiden_name);
+                                  var surname = recordedText(record.last_name);
+                                  var suffix = recordedText(record.suffix);
                                   /* Dates and age are formatted for display only: a zero part
                                      displayRecord wrote as a placeholder is not shown as a real
                                      day, month, year or age (see partials/record-display.ejs). */
@@ -261,14 +271,21 @@
                                 <li>
                                     <article class="record">
                                         <div class="record__head">
-                                            <h3 class="record__name">
-                                                <span class="record__surname"><%= record.last_name %></span><% if (givenNames || record.suffix) { %>,<% } %>
-                                                <% if (givenNames) { %> <span class="record__given"><%= givenNames %></span><% } %>
-                                                <% if (record.suffix) { %> <span class="record__given"><%= record.suffix %></span><% } %>
-                                            </h3>
-                                            <% if (record.maiden_name && String(record.maiden_name).trim() !== "") { %>
-                                                <p class="record__maiden">née <%= record.maiden_name %></p>
-                                            <% } %>
+                                            <h3 class="record__name"><%
+                                                if (givenNames) { %><span class="record__given"><%= givenNames %></span><% }
+                                                if (maidenName) {
+                                                    if (givenNames) { %> <% }
+                                                    %><span class="record__maiden"><%= maidenName %></span><%
+                                                }
+                                                if (surname) {
+                                                    if (givenNames || maidenName) { %> <% }
+                                                    %><span class="record__surname"><%= surname %></span><%
+                                                }
+                                                if (suffix) {
+                                                    if (givenNames || maidenName || surname) { %>, <% }
+                                                    %><span class="record__given"><%= suffix %></span><%
+                                                }
+                                            %></h3>
                                             <ul class="record__badges">
                                                 <li>
                                                     <% /* The record ID is the address of this

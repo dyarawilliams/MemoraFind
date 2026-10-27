@@ -1011,8 +1011,8 @@ legend {
     color: var(--burgundy-mid);
 }
 
-/* Search cards keep the maiden name on its own line, under the name. On the
-   record page it is one part of the heading, so it sits inline at that size. */
+/* On a search card and on the record page the maiden name is one part of the
+   heading, so inside the name it sits inline at that size. */
 .record__name .record__maiden {
     display: inline;
     margin-top: 0;
