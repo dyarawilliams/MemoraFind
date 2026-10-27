@@ -1372,6 +1372,12 @@ a.badge--id-link:focus-visible {
     gap: var(--sp-5);
 }
 
+/* The login error sits under the form, not inside it, so it cannot take the
+   click that was meant for Login. Same gap the form's own rows use. */
+.panel > .notice {
+    margin-top: var(--sp-5);
+}
+
 /* Admin field pairs sit side by side once there is room. */
 .form__pair {
     display: grid;

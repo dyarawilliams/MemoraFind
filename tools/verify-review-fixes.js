@@ -677,18 +677,35 @@ async function main() {
 
   const openGate = await updatePage.handler({ headers: {} }, {});
   check('update page without a session is the login page', openGate.statusCode === 200 && openGate.body.indexOf('Admin login') !== -1 && openGate.body.indexOf('Find a record') === -1);
+  check('a fresh visit does not say the session timed out', openGate.body.indexOf('Session has timed out') === -1);
+  check('the login form has a username control before the password', openGate.body.indexOf('autocomplete="username"') !== -1 && openGate.body.indexOf('autocomplete="username"') < openGate.body.indexOf('autocomplete="current-password"'));
+  check('the username control is not a posted field', /<input[^>]*autocomplete="username"[^>]*>/.test(openGate.body) && !/\bname="username"/.test(openGate.body));
   const signedGate = await updatePage.handler({ headers: { cookie: adminCookie } }, {});
   check('update page with a session is the edit gate', signedGate.statusCode === 200 && signedGate.body.indexOf('Find a record') !== -1);
   const forgedCookie = adminCookie.slice(0, -1) + (adminCookie.slice(-1) === 'a' ? 'b' : 'a');
   const forgedGate = await updatePage.handler({ headers: { cookie: forgedCookie } }, {});
   check('a forged session cookie is rejected', forgedGate.statusCode === 200 && forgedGate.body.indexOf('Admin login') !== -1);
+  check('a forged session is not described as timed out', forgedGate.body.indexOf('Session has timed out') === -1);
+  const expiredBody = Buffer.from(JSON.stringify({
+    v: 1,
+    kind: 'session',
+    sub: TEST_ADMIN_EMAIL,
+    iat: Math.floor(Date.now() / 1000) - 1200,
+    exp: Math.floor(Date.now() / 1000) - 60,
+    jti: 'expired-session-id-0001'
+  }), 'utf8').toString('base64url');
+  const expiredSignature = crypto.createHmac('sha256', process.env.ADMIN_SESSION_SECRET).update(expiredBody).digest('base64url');
+  const expiredGate = await updatePage.handler({
+    headers: { cookie: 'mf_session=' + expiredBody + '.' + expiredSignature }
+  }, {});
+  check('an expired session shows the login page and says it timed out', expiredGate.statusCode === 200 && expiredGate.body.indexOf('Admin login') !== -1 && expiredGate.body.indexOf('Session has timed out. Please log in again.') !== -1 && expiredGate.body.indexOf('Find a record') === -1);
 
   reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
   const anonymousLookup = await getUpdateRecord.handler({
     headers: {},
     queryStringParameters: { memorial_id: '1000004' }
   }, {});
-  check('an anonymous lookup is rejected', anonymousLookup.statusCode === 401 && anonymousLookup.body.indexOf('Admin login') !== -1);
+  check('an anonymous lookup is rejected', anonymousLookup.statusCode === 401 && anonymousLookup.body.indexOf('Admin login') !== -1 && anonymousLookup.body.indexOf('Session has timed out') === -1);
   check('an anonymous lookup does not read the database', calls.length === 0);
   check('an anonymous lookup does not render the record', anonymousLookup.body.indexOf('Wilhelmina') === -1);
 
@@ -964,6 +981,8 @@ async function main() {
     body: formBody({ last_name: 'Abell' })
   }, {});
   check('a logged-out session cannot save', reused.statusCode === 401 && calls.length === 0);
+  const revokedGate = await updatePage.handler({ headers: { cookie: logoutCookie } }, {});
+  check('a logged-out session is not described as timed out', revokedGate.statusCode === 200 && revokedGate.body.indexOf('Admin login') !== -1 && revokedGate.body.indexOf('Session has timed out') === -1);
   reset({ rows: [Object.assign({}, FULL_ROW, { death_day: 12 })], view: 'bcmg_data_formatted_2' });
   const stillSignedIn = await getUpdateRecord.handler({
     headers: { cookie: adminCookie },
