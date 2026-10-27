@@ -157,7 +157,7 @@ A visitor can look a record up and read it, but changing anything requires the a
 2. `/.netlify/functions/updatePage` is that gate: with no valid session cookie it renders the login page, and with a signed session it renders the update page.
 3. On the login page the administrator enters the password. `/.netlify/functions/login` compares it with `ADMIN_PASSWORD_HASH` (or `ADMIN_PASSWORD`) using a constant-time check and, on success, sets an `HttpOnly`, `Secure`, `SameSite=Strict` `mf_session` cookie that expires after ten minutes. The cookie is HMAC-signed with `ADMIN_SESSION_SECRET`. A wrong password re-renders the login page. Repeated failures are locked out — see [Environment Variables](#environment-variables).
 4. `/search/update` (served by `/.netlify/functions/getUpdateRecord`) is the lookup, and it requires that same session. The administrator enters a Memorial ID, and the function looks that record up across the three cemeteries and renders its current values into the edit form — or a message, if the ID matches nothing. A value that is not a number is answered as bad input ("A Memorial ID is a number, for example 1001728") rather than being sent to the database and reported as an outage.
-5. Submitting the edit form POSTs to `/.netlify/functions/updateRecord`, which requires a valid session, writes only allowlisted fields that actually changed, and re-renders the page with a success or an error message. The write uses `SUPABASE_API_KEY` (see below).
+5. Submitting the edit form POSTs to `/.netlify/functions/updateRecord`, which requires a valid session, writes only allowlisted fields that actually changed, and re-renders the page with a success or an error message. The write signs in to Supabase Auth as the administrator and updates with that user's access token. The token stays on the server (see [Environment Variables](#environment-variables)).
 6. `/.netlify/functions/logout` clears the session cookie with the same attributes, forgets that session id in the function's memory, and redirects to `/`.
 
 **[Back to top](#table-of-contents)**
@@ -184,15 +184,16 @@ git clone git@github.com:dyarawilliams/MemoraFind.git
 
 ### Environment Variables
 
-Set these in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). None of the values are recorded in this repository. Public search needs the two Supabase variables. Administrator sign-in also needs the admin variables below — without them, login fails closed and no session cookie is issued.
+Set these in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). None of the values are recorded in this repository. Public search needs the two Supabase variables. Administrator sign-in also needs the admin variables below — without them, login fails closed and no session cookie is issued. A save also needs `ADMIN_EMAIL` to be that user's address in Supabase Auth, and `SUPABASE_ADMIN_PASSWORD` when the Supabase password is not the same as `ADMIN_PASSWORD`.
 
 | Variable | Purpose |
 | --- | --- |
 | `SUPABASE_URL` | the Supabase project URL the functions query |
-| `SUPABASE_API_KEY` | the key the functions use to read records and to save administrator edits |
-| `ADMIN_EMAIL` | the administrator identity stored in the signed session. The login form posts a password only; this address is not typed in |
-| `ADMIN_PASSWORD` | the administrator password, compared in constant time. Ignored when `ADMIN_PASSWORD_HASH` is set |
-| `ADMIN_PASSWORD_HASH` | preferred over `ADMIN_PASSWORD`. A scrypt hash in the form `scrypt:<salt hex>:<key hex>` |
+| `SUPABASE_API_KEY` | the anon key the functions use to read records. The save path starts a Supabase client with this key and then signs in; row-level security does not allow this key to update the tables |
+| `ADMIN_EMAIL` | must be the Supabase Auth user's email. The login form posts a password only; this address is not typed in. The signed session stores it, and the save path signs in to Supabase Auth with it |
+| `ADMIN_PASSWORD` | the site administrator password, compared in constant time. Ignored for site login when `ADMIN_PASSWORD_HASH` is set. Used as the Supabase Auth password only when `SUPABASE_ADMIN_PASSWORD` is unset |
+| `ADMIN_PASSWORD_HASH` | preferred over `ADMIN_PASSWORD` for site login. A scrypt hash in the form `scrypt:<salt hex>:<key hex>`. This does not replace `SUPABASE_ADMIN_PASSWORD` |
+| `SUPABASE_ADMIN_PASSWORD` | that Supabase Auth user's password. It can differ from the site `ADMIN_PASSWORD`. The save path signs in with this when it is set |
 | `ADMIN_SESSION_SECRET` | HMAC secret for the session cookie and the lockout cookie. At least 16 characters, random |
 
 Generate `ADMIN_PASSWORD_HASH` with Node's built-in scrypt (the same defaults the login check uses):
@@ -205,7 +206,9 @@ node -e "const c=require('crypto');const p=process.argv[1];const s=c.randomBytes
 
 **Lockout.** Five failed attempts lock the client out for 15 minutes. The counter is kept in function memory (per client address, in that isolate) and in a signed `mf_fail` cookie, and the stricter of the two wins. This is best-effort on serverless: a new isolate starts with an empty memory counter, and a caller that drops the cookie avoids the copy it was holding. No Supabase table was added, so lockout does not need a schema change.
 
-**Saves and row-level security.** `updateRecord` writes with `SUPABASE_API_KEY`, not with a user JWT. That key has to be allowed to `UPDATE` (and `SELECT`) `bcmg_data`, `capernaum_data` and `honeyford_data`. A service-role key bypasses RLS. An anon key updates a row only when a policy allows it, and a policy that lets `anon` update these tables also lets anyone who has that key write straight to the Supabase API — so the key stays in Netlify's environment either way. Check what is in place before relying on a save:
+**Saves and row-level security.** `bcmg_data`, `capernaum_data` and `honeyford_data` permit `UPDATE` for the authenticated Supabase user. The anon key in `SUPABASE_API_KEY` can read, and a write with that key alone changes zero rows. `updateRecord` still requires the signed `mf_session` cookie before it does anything. On the server it then signs in to Supabase Auth with `ADMIN_EMAIL` and `SUPABASE_ADMIN_PASSWORD` (falling back to `ADMIN_PASSWORD` when `SUPABASE_ADMIN_PASSWORD` is unset), using `supabase.auth.signInWithPassword` on a fresh client created with `persistSession: false`. The update and the `select('*')` that returns the changed row run as that user. The access token stays in the function isolate until it is near expiry; a write that comes back unauthorized refreshes the session or signs in again. The token is never written to a cookie, the response, or the log. If sign-in fails, the function log says `Supabase admin sign-in failed` and the page shows "Error Updating Record. Please try again." A write that changes zero rows is a different failure: the page says nothing was saved. Reads — the edit form, search, and the record page — still use `SUPABASE_API_KEY` alone, because those selects are allowed without a user session.
+
+The policies below are what has to allow that authenticated user to `UPDATE` and `SELECT` the three tables:
 
 ```sql
 select tablename, policyname, cmd, roles, qual, with_check
@@ -235,7 +238,7 @@ Deployment is done by Netlify from this repository. `netlify.toml` publishes `pu
 ## Known Issues and What Is Not Built Yet
 
 * **The burial location is missing from the source data.** Every record renders "Section and lot not recorded", and that is the honest answer: 2,425 of the 2,428 records have no section or lot at all, and the three that show a value show a wrong one that our own pattern-matching invented from unrelated words on the source page ("Section BAMBERG", "Section MARKER", "Section 2011"). The scraper reads Find a Grave's "Plot info" line, which for these three cemeteries contains only `bamberg county memory` or `Marker only` — so re-scraping would not produce a location. Until the plots are collected by hand (walking the cemeteries or working from photographs) or come from the cemeteries or the county library, the site cannot say where a grave is. The page never guesses: where a record does carry a section or lot it is shown, and otherwise the fact says it was not recorded.
-* **The administrator save path has not been exercised against the live database.** The handlers are checked with a stub database (`node tools/verify-review-fixes.js`), including login, lockout, logout, a rejected anonymous save, the field allowlist and a missing cemetery. A real save still has to be confirmed on a deploy preview once Netlify has the admin variables and `SUPABASE_API_KEY` is allowed to update the three base tables.
+* **The administrator save path has not been exercised against the live database.** The handlers are checked with a stub database (`node tools/verify-review-fixes.js`), including login, lockout, logout, a rejected anonymous save, the field allowlist, a missing cemetery, a Supabase sign-in that supplies the access token for the update, and a Supabase sign-in that fails. A real save still has to be confirmed on a deploy preview once Netlify has `ADMIN_EMAIL` set to the Supabase Auth user's email and `SUPABASE_ADMIN_PASSWORD` set to that user's Supabase password. That password can differ from `ADMIN_PASSWORD`.
 * **Photos, biographies and family connections are not built.** No photograph, biography or family relationship is stored in or read from the data, and none of them appear in the interface. They need new data structures in the Supabase project and a decision on who moderates a stranger's contribution to someone's memorial before any of it can start. The nearest the site comes today is the free-text `notes` and the `moved_from` / `moved_to` relocation fields, which a search card and a record page show under "More details" when the record actually carries one.
 
 **[Back to top](#table-of-contents)**
