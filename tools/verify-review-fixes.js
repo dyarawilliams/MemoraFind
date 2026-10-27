@@ -12,7 +12,11 @@
  *
  * Admin sign-in is exercised here too: login success and failure, lockout,
  * logout, a rejected anonymous save, the field allowlist, and a missing
- * cemetery. This script sets the admin environment variables itself.
+ * cemetery. The save's Supabase Auth sign-in is stubbed as well: a successful
+ * sign-in attaches an access token to the update, and a failed sign-in is an
+ * error. No request leaves this process. The address is TEST_ADMIN_EMAIL,
+ * not a real Supabase user. This script sets the admin environment variables
+ * itself.
  */
 
 'use strict';
@@ -24,7 +28,9 @@ const crypto = require('crypto');
 const querystring = require('querystring');
 
 const ADMIN_PASSWORD = 'correct-horse-battery';
-const TEST_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.test';
+const SUPABASE_ADMIN_PASSWORD = 'supabase-admin-secret';
+const TEST_ADMIN_EMAIL = 'admin@example.test';
+const STUB_ACCESS_TOKEN = 'stub-access-token';
 
 const failures = [];
 let passed = 0;
@@ -74,13 +80,28 @@ function ilikeMatches(pattern, value) {
 }
 
 const calls = [];
+const signIns = [];
+const refreshes = [];
+let signInShouldFail = false;
+let refreshShouldFail = false;
+let sessionExpiresInSeconds = 3600;
 let next = { rows: [], count: null, error: null, view: null };
+
+function expectedStubPassword() {
+  const dedicated = process.env.SUPABASE_ADMIN_PASSWORD;
+  if (typeof dedicated === 'string' && dedicated.length > 0) return dedicated;
+  return process.env.ADMIN_PASSWORD || '';
+}
 
 function respond(state) {
   if (state.update) {
-    if (next.updateError) return { data: null, error: next.updateError };
-    if (Array.isArray(next.updatedRows)) return { data: next.updatedRows, error: null };
-    return { data: next.rows, error: null };
+    if (next.updateError) {
+      const updateError = next.updateError;
+      if (next.updateErrorOnce) next.updateError = null;
+      return { data: null, error: updateError, status: updateError.status || 400 };
+    }
+    if (Array.isArray(next.updatedRows)) return { data: next.updatedRows, error: null, status: 200 };
+    return { data: next.rows, error: null, status: 200 };
   }
   if (String(state.table).endsWith('_formatted_2')) {
     if (next.view && state.table === next.view) {
@@ -91,8 +112,8 @@ function respond(state) {
     }
     return { data: [], error: null };
   }
-  if (next.error) return { data: null, count: null, error: next.error };
-  return { data: next.rows, count: next.count, error: null };
+  if (next.error) return { data: null, count: null, error: next.error, status: 500 };
+  return { data: next.rows, count: next.count, error: null, status: 200 };
 }
 
 function makeBuilder(state) {
@@ -138,7 +159,8 @@ function makeBuilder(state) {
         const rows = result.data;
         result = {
           data: Array.isArray(rows) && rows.length > 0 ? rows[0] : null,
-          error: result.error
+          error: result.error,
+          status: result.status
         };
       }
       return Promise.resolve(result).then(resolve, reject);
@@ -147,8 +169,68 @@ function makeBuilder(state) {
   return builder;
 }
 
-function createClient() {
+function createClient(url, key, options) {
+  let accessToken = null;
+  const authOptions = options && options.auth ? options.auth : null;
   return {
+    auth: {
+      signInWithPassword: function (credentials) {
+        const email = credentials && credentials.email;
+        const password = credentials && credentials.password;
+        signIns.push({
+          email: email,
+          url: url,
+          persistSession: authOptions ? authOptions.persistSession : undefined,
+          autoRefreshToken: authOptions ? authOptions.autoRefreshToken : undefined,
+          usedSupabaseAdminPassword: typeof process.env.SUPABASE_ADMIN_PASSWORD === 'string' && process.env.SUPABASE_ADMIN_PASSWORD.length > 0 && password === process.env.SUPABASE_ADMIN_PASSWORD,
+          usedSiteAdminPassword: password === process.env.ADMIN_PASSWORD
+        });
+        if (signInShouldFail || email !== String(process.env.ADMIN_EMAIL || '') || password !== expectedStubPassword()) {
+          return Promise.resolve({
+            data: { user: null, session: null },
+            error: { message: 'Invalid login credentials' }
+          });
+        }
+        accessToken = STUB_ACCESS_TOKEN;
+        const expiresIn = sessionExpiresInSeconds;
+        return Promise.resolve({
+          data: {
+            user: { id: 'stub-user', email: email },
+            session: {
+              access_token: accessToken,
+              refresh_token: 'stub-refresh-token',
+              expires_in: expiresIn,
+              expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+              token_type: 'bearer'
+            }
+          },
+          error: null
+        });
+      },
+      refreshSession: function () {
+        refreshes.push({ clientHadToken: Boolean(accessToken) });
+        if (refreshShouldFail || !accessToken) {
+          return Promise.resolve({
+            data: { user: null, session: null },
+            error: { message: 'refresh failed' }
+          });
+        }
+        accessToken = STUB_ACCESS_TOKEN;
+        return Promise.resolve({
+          data: {
+            user: { id: 'stub-user', email: process.env.ADMIN_EMAIL },
+            session: {
+              access_token: accessToken,
+              refresh_token: 'stub-refresh-token',
+              expires_in: 3600,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+              token_type: 'bearer'
+            }
+          },
+          error: null
+        });
+      }
+    },
     from: function (table) {
       return makeBuilder({
         table: table,
@@ -159,7 +241,8 @@ function createClient() {
         range: null,
         limit: null,
         update: null,
-        single: false
+        single: false,
+        accessToken: accessToken
       });
     }
   };
@@ -173,10 +256,11 @@ Module._load = function (request, parent, isMain) {
   return originalLoad.apply(this, arguments);
 };
 
-process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost';
-process.env.SUPABASE_API_KEY = process.env.SUPABASE_API_KEY || 'test-key';
+process.env.SUPABASE_URL = 'http://127.0.0.1';
+process.env.SUPABASE_API_KEY = 'test-key';
 process.env.ADMIN_EMAIL = TEST_ADMIN_EMAIL;
 process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
+process.env.SUPABASE_ADMIN_PASSWORD = SUPABASE_ADMIN_PASSWORD;
 process.env.ADMIN_SESSION_SECRET = 'test-session-secret-0123456789';
 delete process.env.ADMIN_PASSWORD_HASH;
 
@@ -266,6 +350,17 @@ function cookieFlags(value) {
     && value.indexOf('Secure') !== -1
     && value.indexOf('SameSite=Strict') !== -1
     && value.indexOf('Path=/') !== -1;
+}
+
+function responseCarriesSecret(response) {
+  const text = String(response && response.body || '')
+    + '\n' + cookieHeaders(response || {}).join('\n')
+    + '\n' + JSON.stringify((response && response.headers) || {});
+  return text.indexOf(STUB_ACCESS_TOKEN) !== -1
+    || text.indexOf('stub-refresh-token') !== -1
+    || text.indexOf(SUPABASE_ADMIN_PASSWORD) !== -1
+    || text.indexOf(ADMIN_PASSWORD) !== -1
+    || text.indexOf(TEST_ADMIN_EMAIL) !== -1;
 }
 
 function loginEvent(password, ip) {
@@ -481,6 +576,9 @@ async function main() {
   check('the save path no longer splits the cemetery view', updateSource.indexOf('.split(') === -1);
   check('the save path selects every column', updateSource.indexOf(".select('*')") !== -1);
   check('the save path does not name a column in select', updateSource.indexOf("select('memorial_id'") === -1 && updateSource.indexOf('select("memorial_id"') === -1);
+  check('the save signs in with signInWithPassword', updateSource.indexOf('signInWithPassword') !== -1);
+  check('the save client sets persistSession false', updateSource.indexOf('persistSession: false') !== -1);
+  check('the save reads SUPABASE_ADMIN_PASSWORD', updateSource.indexOf('SUPABASE_ADMIN_PASSWORD') !== -1);
 
   const views = {
     bcmg_data_formatted_2: 'bcmg_data',
@@ -513,12 +611,15 @@ async function main() {
     same('edit form for ' + view + ' reads ' + views[view], read && read.table, views[view]);
     check('edit form does not read the view', read && String(read.table).indexOf('formatted') === -1);
     check('edit form still receives the stored death day', page.statusCode === 200 && page.body.indexOf('value="12"') !== -1);
+    check('edit form read does not use a supabase access token', read && !read.accessToken);
+    check('edit form does not sign in to Supabase', signIns.length === 0);
     const lookedUp = calls.filter(function (call) { return String(call.table).endsWith('_formatted_2'); }).map(function (call) { return call.table; });
     check('findCemetery was consulted for ' + view, lookedUp.indexOf(view) !== -1);
   }
 
-  const updateSourceHasLocalCopy = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/getUpdateRecord.js'), 'utf8').indexOf("split('_', 2)") !== -1;
-  check('getUpdateRecord no longer has its own split', updateSourceHasLocalCopy === false);
+  const lookupSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/getUpdateRecord.js'), 'utf8');
+  check('getUpdateRecord no longer has its own split', lookupSource.indexOf("split('_', 2)") === -1);
+  check('the edit lookup does not sign in to Supabase', lookupSource.indexOf('signInWithPassword') === -1);
 
   // --- 4. Admin session and the save path --------------------------------
   const loginSource = fs.readFileSync(path.resolve(__dirname, '../netlify/functions/login.js'), 'utf8');
@@ -606,6 +707,7 @@ async function main() {
   }, {});
   check('an anonymous save is rejected', anonymousSave.statusCode === 401 && anonymousSave.body.indexOf('Admin login') !== -1 && anonymousSave.body.indexOf('updated successfully') === -1);
   check('an anonymous save does not write', calls.length === 0);
+  check('an anonymous save does not sign in to Supabase', signIns.length === 0);
 
   reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
   const forgedSave = await updateRecord.handler({
@@ -638,8 +740,18 @@ async function main() {
     same('save for ' + view + ' reads with select *', read && read.select, '*');
     same('save for ' + view + ' returns rows with select *', writes[0] && writes[0].select, '*');
     check('save for ' + view + ' is a single write', writes.length === 1);
+    check('save for ' + view + ' updates with the supabase access token', writes[0] && writes[0].accessToken === STUB_ACCESS_TOKEN);
+    check('save for ' + view + ' reads without a supabase access token', read && !read.accessToken);
+    check('save for ' + view + ' does not return the supabase token', responseCarriesSecret(saved) === false);
   }
 
+  check('the save signs in once and reuses that session', signIns.length === 1);
+  check('the save signs in as TEST_ADMIN_EMAIL', signIns[0] && signIns[0].email === TEST_ADMIN_EMAIL);
+  check('the save signs in with SUPABASE_ADMIN_PASSWORD', signIns[0] && signIns[0].usedSupabaseAdminPassword === true && signIns[0].usedSiteAdminPassword === false);
+  check('the save client does not persist the session', signIns[0] && signIns[0].persistSession === false && signIns[0].autoRefreshToken === false);
+  check('the save does not sign in against a real address', signIns[0] && signIns[0].url === 'http://127.0.0.1');
+
+  const signInsBeforeUnchanged = signIns.length;
   reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
   const unchanged = await updateRecord.handler({
     httpMethod: 'POST',
@@ -647,6 +759,7 @@ async function main() {
     body: formBody()
   }, {});
   check('an unchanged form does not write', unchanged.statusCode === 200 && unchanged.body.indexOf('No fields were changed') !== -1 && calls.every(function (call) { return !call.update; }));
+  check('an unchanged form does not sign in again', signIns.length === signInsBeforeUnchanged);
 
   reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
   const badBirthYear = await updateRecord.handler({
@@ -681,6 +794,8 @@ async function main() {
   const zeroWrite = calls.filter(function (call) { return call.update; })[0];
   check('a write that changes no row is not reported as saved', zeroRows.statusCode === 500 && zeroRows.body.indexOf('Nothing was saved') !== -1 && zeroRows.body.indexOf('updated successfully') === -1);
   same('that write still asked for every column back', zeroWrite && zeroWrite.select, '*');
+  check('a zero-row write still used the supabase access token', zeroWrite && zeroWrite.accessToken === STUB_ACCESS_TOKEN);
+  check('a zero-row write does not return the supabase token', responseCarriesSecret(zeroRows) === false);
 
   reset({ rows: [Object.assign({}, FULL_ROW)], view: null });
   const missingCemetery = await updateRecord.handler({
@@ -691,6 +806,150 @@ async function main() {
   check('a missing cemetery is reported and does not throw', missingCemetery.statusCode === 404 && missingCemetery.body.indexOf('not found') !== -1 && missingCemetery.body.indexOf('TypeError') === -1);
   check('a missing cemetery does not write', calls.every(function (call) { return !call.update; }));
   check('a missing cemetery is not described as a successful save', missingCemetery.body.indexOf('updated successfully') === -1);
+
+  updateRecord.resetAdminAuthForTests();
+  sessionExpiresInSeconds = 30;
+  const signInsBeforeRefresh = signIns.length;
+  const refreshesBefore = refreshes.length;
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const firstShort = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const secondShort = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  sessionExpiresInSeconds = 3600;
+  const refreshedWrite = calls.filter(function (call) { return call.update; })[0];
+  check('a near-expiry session still saves', firstShort.statusCode === 200 && secondShort.statusCode === 200 && secondShort.body.indexOf('updated successfully') !== -1);
+  check('a near-expiry session signs in once', signIns.length === signInsBeforeRefresh + 1);
+  check('a near-expiry session refreshes instead of signing in again', refreshes.length === refreshesBefore + 1);
+  check('the refreshed save uses the access token', refreshedWrite && refreshedWrite.accessToken === STUB_ACCESS_TOKEN && responseCarriesSecret(secondShort) === false);
+
+  updateRecord.resetAdminAuthForTests();
+  refreshShouldFail = true;
+  const signInsBeforeUnauthorized = signIns.length;
+  const refreshesBeforeUnauthorized = refreshes.length;
+  reset({
+    rows: [Object.assign({}, FULL_ROW)],
+    view: 'bcmg_data_formatted_2',
+    updateError: { message: 'JWT expired', code: 'PGRST301', status: 401 },
+    updateErrorOnce: true
+  });
+  const retried = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  refreshShouldFail = false;
+  const retryWrites = calls.filter(function (call) { return call.update; });
+  check('an unauthorized update signs in again and saves', retried.statusCode === 200 && retried.body.indexOf('updated successfully') !== -1 && retried.body.indexOf('Nothing was saved') === -1);
+  check('an unauthorized update refreshes, then signs in again', refreshes.length === refreshesBeforeUnauthorized + 1 && signIns.length === signInsBeforeUnauthorized + 2);
+  check('both attempts of an unauthorized update carry the access token', retryWrites.length === 2 && retryWrites.every(function (call) { return call.accessToken === STUB_ACCESS_TOKEN; }));
+  check('an unauthorized update does not return the supabase token', responseCarriesSecret(retried) === false);
+
+  updateRecord.resetAdminAuthForTests();
+  signInShouldFail = true;
+  const signInLogs = [];
+  const originalConsoleError = console.error;
+  console.error = function () {
+    const parts = [];
+    for (let i = 0; i < arguments.length; i += 1) {
+      const part = arguments[i];
+      if (typeof part === 'string') parts.push(part);
+      else if (part && typeof part === 'object' && part.message) parts.push(String(part.message));
+      else parts.push(String(part));
+    }
+    signInLogs.push(parts.join(' '));
+    return originalConsoleError.apply(console, arguments);
+  };
+  let failedSignIn;
+  try {
+    reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+    failedSignIn = await updateRecord.handler({
+      httpMethod: 'POST',
+      headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+      body: formBody({ last_name: 'Abell' })
+    }, {});
+  } finally {
+    console.error = originalConsoleError;
+    signInShouldFail = false;
+  }
+  const failureLines = signInLogs.filter(function (line) { return line.indexOf('Supabase admin sign-in failed') !== -1; });
+  const failureLog = signInLogs.join('\n');
+  check('a failed Supabase sign-in shows the existing save error', failedSignIn.statusCode === 500 && failedSignIn.body.indexOf('Error Updating Record. Please try again.') !== -1);
+  check('a failed Supabase sign-in is not a zero-row save', failedSignIn.body.indexOf('Nothing was saved') === -1);
+  check('a failed Supabase sign-in does not write', calls.every(function (call) { return !call.update; }));
+  check('a failed Supabase sign-in is logged once', failureLines.length === 1);
+  check('a failed Supabase sign-in does not log the password, email, or token', failureLog.indexOf(SUPABASE_ADMIN_PASSWORD) === -1 && failureLog.indexOf(ADMIN_PASSWORD) === -1 && failureLog.indexOf(TEST_ADMIN_EMAIL) === -1 && failureLog.indexOf(STUB_ACCESS_TOKEN) === -1);
+  check('a failed Supabase sign-in response has no token', responseCarriesSecret(failedSignIn) === false);
+
+  updateRecord.resetAdminAuthForTests();
+  const savedSupabasePassword = process.env.SUPABASE_ADMIN_PASSWORD;
+  delete process.env.SUPABASE_ADMIN_PASSWORD;
+  const signInsBeforeFallback = signIns.length;
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const fallbackSave = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  const fallbackAttempt = signIns[signIns.length - 1];
+  const fallbackWrite = calls.filter(function (call) { return call.update; })[0];
+  check('an unset SUPABASE_ADMIN_PASSWORD falls back to ADMIN_PASSWORD', fallbackSave.statusCode === 200 && fallbackSave.body.indexOf('updated successfully') !== -1 && signIns.length === signInsBeforeFallback + 1 && fallbackAttempt.email === TEST_ADMIN_EMAIL && fallbackAttempt.usedSiteAdminPassword === true && fallbackAttempt.usedSupabaseAdminPassword === false);
+  check('the fallback sign-in updates with the access token', fallbackWrite && fallbackWrite.accessToken === STUB_ACCESS_TOKEN && responseCarriesSecret(fallbackSave) === false);
+
+  updateRecord.resetAdminAuthForTests();
+  process.env.SUPABASE_ADMIN_PASSWORD = '';
+  const signInsBeforeEmpty = signIns.length;
+  reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+  const emptyPasswordSave = await updateRecord.handler({
+    httpMethod: 'POST',
+    headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+    body: formBody({ last_name: 'Abell' })
+  }, {});
+  const emptyAttempt = signIns[signIns.length - 1];
+  check('an empty SUPABASE_ADMIN_PASSWORD falls back to ADMIN_PASSWORD', emptyPasswordSave.statusCode === 200 && signIns.length === signInsBeforeEmpty + 1 && emptyAttempt.usedSiteAdminPassword === true && emptyAttempt.usedSupabaseAdminPassword === false);
+
+  updateRecord.resetAdminAuthForTests();
+  delete process.env.SUPABASE_ADMIN_PASSWORD;
+  const savedSitePassword = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  const missingPasswordLogs = [];
+  const originalMissingLog = console.error;
+  console.error = function () {
+    const parts = [];
+    for (let i = 0; i < arguments.length; i += 1) {
+      const part = arguments[i];
+      if (typeof part === 'string') parts.push(part);
+      else if (part && typeof part === 'object' && part.message) parts.push(String(part.message));
+      else parts.push(String(part));
+    }
+    missingPasswordLogs.push(parts.join(' '));
+    return originalMissingLog.apply(console, arguments);
+  };
+  let missingPassword;
+  const signInsBeforeMissing = signIns.length;
+  try {
+    reset({ rows: [Object.assign({}, FULL_ROW)], view: 'bcmg_data_formatted_2' });
+    missingPassword = await updateRecord.handler({
+      httpMethod: 'POST',
+      headers: { cookie: adminCookie, 'x-forwarded-for': '198.51.100.10' },
+      body: formBody({ last_name: 'Abell' })
+    }, {});
+  } finally {
+    console.error = originalMissingLog;
+    process.env.ADMIN_PASSWORD = savedSitePassword;
+    process.env.SUPABASE_ADMIN_PASSWORD = savedSupabasePassword;
+    updateRecord.resetAdminAuthForTests();
+  }
+  check('a save with no Supabase password shows the existing save error', missingPassword.statusCode === 500 && missingPassword.body.indexOf('Error Updating Record. Please try again.') !== -1 && missingPassword.body.indexOf('Nothing was saved') === -1);
+  check('a save with no Supabase password does not write or call sign-in', calls.every(function (call) { return !call.update; }) && signIns.length === signInsBeforeMissing);
+  check('a save with no Supabase password logs the sign-in failure', missingPasswordLogs.filter(function (line) { return line.indexOf('Supabase admin sign-in failed') !== -1; }).length === 1);
 
   const logoutLogin = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.30'), {});
   const logoutCookie = sessionPair(logoutLogin);
@@ -734,6 +993,8 @@ async function main() {
   console.log('age_sane, notes, moved_from and moved_to the base tables lack');
   console.log('is still unknown; those four are on the formatted views and');
   console.log('absent from the scraper CSVs. No Supabase credentials here.');
+  console.log('Sign-in is stubbed. The address is ' + TEST_ADMIN_EMAIL + ',');
+  console.log('not a real Supabase user, and no request leaves this process.');
 }
 
 main().catch(function (error) {
