@@ -331,17 +331,35 @@ function establishSession() {
   };
 }
 
-function readSession(event) {
+function describeSession(event) {
   prune(Date.now());
   const cookies = parseCookies(headerValue(event, 'cookie'));
-  const payload = readToken(cookies[SESSION_COOKIE_NAME]);
-  if (!payload || payload.kind !== 'session' || payload.v !== 1) return null;
-  if (typeof payload.sub !== 'string' || typeof payload.jti !== 'string') return null;
+  const raw = cookies[SESSION_COOKIE_NAME];
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return { session: null, reason: 'absent' };
+  }
+  const payload = readToken(raw);
+  if (!payload || payload.kind !== 'session' || payload.v !== 1) {
+    return { session: null, reason: 'invalid' };
+  }
+  if (typeof payload.sub !== 'string' || typeof payload.jti !== 'string') {
+    return { session: null, reason: 'invalid' };
+  }
   const email = adminEmail();
-  if (!email || !timingSafeEqualString(payload.sub, email)) return null;
-  if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) return null;
-  if (revoked.has(payload.jti)) return null;
-  return payload;
+  if (!email || !timingSafeEqualString(payload.sub, email)) {
+    return { session: null, reason: 'invalid' };
+  }
+  if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) {
+    return { session: null, reason: 'expired' };
+  }
+  if (revoked.has(payload.jti)) {
+    return { session: null, reason: 'invalid' };
+  }
+  return { session: payload, reason: 'ok' };
+}
+
+function readSession(event) {
+  return describeSession(event).session;
 }
 
 function revokeSession(session) {
@@ -360,12 +378,15 @@ function clearSessionCookies() {
 }
 
 async function requireAdmin(event, deniedStatus) {
-  const session = readSession(event);
-  if (session) return { session: session, response: null };
-  const response = await renderLogin(
-    'Session has timed out. Please log in again.',
-    deniedStatus || 401
-  );
+  const described = describeSession(event);
+  if (described.session) return { session: described.session, response: null };
+  // A missing or unusable cookie is not a timeout. Saying so on a fresh visit
+  // puts an alert on the login form before the administrator has done anything,
+  // and that alert is what the first Login click dismisses instead of submitting.
+  const message = described.reason === 'expired'
+    ? 'Session has timed out. Please log in again.'
+    : null;
+  const response = await renderLogin(message, deniedStatus || 401);
   return { session: null, response: response };
 }
 
