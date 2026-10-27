@@ -457,6 +457,10 @@ async function main() {
   check('the card shows notes, moved_from and moved_to', search.body.indexOf('Stone reads 100% of the name') !== -1 && search.body.indexOf('Plot A_1') !== -1 && search.body.indexOf('Plot B\\2') !== -1);
   check('the card shows the burial location that was stored', search.body.indexOf('Section Garden') !== -1 && search.body.indexOf('Lot 4') !== -1);
   check('the card shows the stored age', search.body.indexOf('>101<') !== -1);
+  check('the card writes given names, maiden name, surname, then suffix',
+    search.body.indexOf('<span class="record__given">Wilhelmina J</span> <span class="record__maiden">Doe</span> <span class="record__surname">Abel</span>, <span class="record__given">Jr</span>') !== -1 &&
+    search.body.indexOf('née') === -1 &&
+    search.body.indexOf('<p class="record__maiden">') === -1);
 
   reset();
   const idle = await renderSearch.handler({ path: '/search/capernaum', queryStringParameters: { lastName: '   ' } }, {});
