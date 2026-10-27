@@ -520,7 +520,9 @@ async function main() {
     grave.body.indexOf('Section Garden') !== -1 &&
     grave.body.indexOf('Lot 4') !== -1 &&
     grave.body.indexOf('Veteran') !== -1 &&
-    grave.body.indexOf('née Doe') !== -1);
+    grave.body.indexOf('<span class="record__maiden">Doe</span>') !== -1 &&
+    grave.body.indexOf('Wilhelmina J Doe Abel, Jr') !== -1 &&
+    grave.body.indexOf('née') === -1);
   check('grave does not print a zero placeholder', grave.body.indexOf('0/0/0') === -1 && grave.body.indexOf('00/0/') === -1);
 
   const sameCard = search.body.indexOf('09/12/2008') !== -1 && grave.body.indexOf('09/12/2008') !== -1;
