@@ -96,13 +96,14 @@
                 <article class="record">
                     <div class="record__head">
                         <h1 class="record__name record__name--page">
-                            <span class="record__surname"><%= surname %></span><% if (givenNames || suffix) { %>,<% } %>
                             <% if (givenNames) { %> <span class="record__given"><%= givenNames %></span><% } %>
+                            <% if (maidenName) { %>
+                                <p class="record__maiden"><%= maidenName %></p>
+                            <% } %>
+                            <span class="record__surname"><%= surname %></span><% if (givenNames || suffix) { %>,<% } %>
                             <% if (suffix) { %> <span class="record__given"><%= suffix %></span><% } %>
                         </h1>
-                        <% if (maidenName) { %>
-                            <p class="record__maiden">née <%= maidenName %></p>
-                        <% } %>
+                        
                         <ul class="record__badges">
                             <li>
                                 <span class="badge badge--id">
