@@ -1,5 +1,8 @@
     </main>
-
+<%
+  /* Same optional currentNav the header reads. Only the contact page passes it. */
+  var _currentNav = (typeof currentNav !== "undefined" && currentNav) ? currentNav : "";
+%>
     <footer class="site-footer">
         <div class="container site-footer__inner">
             <div class="site-footer__brand">
@@ -15,6 +18,7 @@
                     <li><a href="/">Home</a></li>
                     <li><a href="/#search">Search records</a></li>
                     <li><a href="/#cemeteries">Cemeteries</a></li>
+                    <li><a href="/contact"<% if (_currentNav === "contact") { %> aria-current="page"<% } %>>Contact Us</a></li>
                     <li><a href="/.netlify/functions/updatePage">Update a record</a></li>
                 </ul>
             </nav>

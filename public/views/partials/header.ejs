@@ -54,6 +54,9 @@
       var _canonicalUrl = _canonicalPath ? SITE_ORIGIN + _canonicalPath : null;
       var _shareImage = SITE_ORIGIN + "/assets/og-card.png";
       var _shareImageAlt = "MemoraFind, Bamberg County, SC — search Bamberg County burial records; every person has a page of their own.";
+      /* currentNav is optional. The contact page passes "contact" so the
+         matching link in this nav can be marked as the current page. */
+      var _currentNav = (typeof currentNav !== "undefined" && currentNav) ? currentNav : "";
     %>
     <title><%= _pageTitle %></title>
     <meta name="description" content="<%= _pageDescription %>" />
@@ -102,6 +105,7 @@
                     <li><a href="/">Home</a></li>
                     <li><a href="/#search">Search records</a></li>
                     <li><a href="/#cemeteries">Cemeteries</a></li>
+                    <li><a href="/contact"<% if (_currentNav === "contact") { %> aria-current="page"<% } %>>Contact Us</a></li>
                     <li>
                         <a class="site-nav__admin" href="/.netlify/functions/updatePage">
                             Update a record

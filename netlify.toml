@@ -2,11 +2,22 @@
   publish = "public"
   functions = "netlify/functions"
 
+# The public address on /contact is the same value as ADMIN_EMAIL. Omit that
+# key from secrets scanning so the address can stay in the page. Scanning
+# itself stays on; this does not disable it. Add further keys with a comma.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "ADMIN_EMAIL"
+
 [[redirects]]
   from = "/"
   to = "/.netlify/functions/renderIndex"
   status = 200
-  
+
+[[redirects]]
+  from = "/contact"
+  to = "/.netlify/functions/renderContact"
+  status = 200
+
 [[redirects]]
   from = "/search/update"
   to = "/.netlify/functions/getUpdateRecord"
