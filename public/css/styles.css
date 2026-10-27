@@ -1011,6 +1011,15 @@ legend {
     color: var(--burgundy-mid);
 }
 
+/* Search cards keep the maiden name on its own line, under the name. On the
+   record page it is one part of the heading, so it sits inline at that size. */
+.record__name .record__maiden {
+    display: inline;
+    margin-top: 0;
+    font-size: inherit;
+    font-weight: 500;
+}
+
 .record__badges {
     list-style: none;
     margin: var(--sp-3) 0 0;
@@ -1171,8 +1180,7 @@ a.badge--id-link:focus-visible {
     text-decoration-color: var(--burgundy-deep);
 }
 
-/* The person's name is the heading of the page, written exactly the way the
-   search card writes it, at the h1 size. */
+/* The person's name is the page heading, at the h1 size. */
 .record__name--page {
     font-size: var(--fs-2xl);
 }

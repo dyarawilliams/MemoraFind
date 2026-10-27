@@ -17,10 +17,11 @@
      the same words as the search card
      (partials/fact-burial-location.ejs) and no further.
 
-     The name is written the way the search card writes it — "Last, First
-     Middle Suffix", with the prefix and the Veteran flag as badges — so the
-     page and the result card can be compared word for word. The Age row is
-     shown only when the record has a usable age, and the Veteran badge only
+     The heading, the page title and the breadcrumb use the same order:
+     given names, maiden name, surname, then suffix — "Caretha Rice Williams",
+     or "Robert Smith, Jr." when a suffix was recorded. A comma is written only
+     before a suffix. The prefix and the Veteran flag are badges. The Age row
+     is shown only when the record has a usable age, and the Veteran badge only
      when the record is flagged as one, both exactly as the card does. */
   var display = {};
   include('partials/record-display.ejs', { display: display });
@@ -42,11 +43,14 @@
   var prefix = recordedText(record.prefix);
   var maidenName = recordedText(record.maiden_name);
 
-  var nameText = [
-      surname + ((surname && (givenNames || suffix)) ? "," : ""),
-      givenNames,
-      suffix
-  ].filter(function (part) { return part !== ""; }).join(" ");
+  /* Same order as the heading below. The comma belongs to the suffix
+     ("Smith, Jr."), so a record with no suffix does not end in one. */
+  var nameBeforeSuffix = [givenNames, maidenName, surname]
+      .filter(function (part) { return part !== ""; })
+      .join(" ");
+  var nameText = suffix
+      ? (nameBeforeSuffix ? nameBeforeSuffix + ", " + suffix : suffix)
+      : nameBeforeSuffix;
 
   var bornDate = display.formatRecordedDate(record.birth_date);
   var diedDate = display.formatRecordedDate(record.death_date);
@@ -95,15 +99,21 @@
 
                 <article class="record">
                     <div class="record__head">
-                        <h1 class="record__name record__name--page">
-                            <% if (givenNames) { %> <span class="record__given"><%= givenNames %></span><% } %>
-                            <% if (maidenName) { %>
-                                <p class="record__maiden"><%= maidenName %></p>
-                            <% } %>
-                            <span class="record__surname"><%= surname %></span><% if (givenNames || suffix) { %>,<% } %>
-                            <% if (suffix) { %> <span class="record__given"><%= suffix %></span><% } %>
-                        </h1>
-                        
+                        <h1 class="record__name record__name--page"><%
+                            if (givenNames) { %><span class="record__given"><%= givenNames %></span><% }
+                            if (maidenName) {
+                                if (givenNames) { %> <% }
+                                %><span class="record__maiden"><%= maidenName %></span><%
+                            }
+                            if (surname) {
+                                if (givenNames || maidenName) { %> <% }
+                                %><span class="record__surname"><%= surname %></span><%
+                            }
+                            if (suffix) {
+                                if (givenNames || maidenName || surname) { %>, <% }
+                                %><span class="record__given"><%= suffix %></span><%
+                            }
+                        %></h1>
                         <ul class="record__badges">
                             <li>
                                 <span class="badge badge--id">
