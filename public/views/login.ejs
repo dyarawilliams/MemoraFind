@@ -16,23 +16,61 @@
                 <h2 class="subhead">This session will expire in 10 minutes.</h2>
 
                 <form action="/.netlify/functions/login" method="POST" id="login-form" class="page-form">
+                    <%#
+                      The gate asks for a password and nothing else, but a form
+                      whose only control is a password is not a sign-in form to
+                      the browser. It then withholds autofill until the first
+                      Login click, the empty required field rejects that click,
+                      and the password is only submitted on the next one. This
+                      control is hidden and has no name, so it is not posted.
+                    %>
+                    <input type="text" autocomplete="username" hidden />
+
                     <div class="field">
                         <label for="password">Password</label>
                         <input type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required />
                     </div>
 
                     <button type="submit" class="btn btn--primary btn--block">Login</button>
-
-                    <% if (typeof locals.message !== "undefined" && locals.message) { %>
-                        <p class="notice notice--error" role="alert">
-                            <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                                <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
-                            </svg>
-                            <span><%= locals.message %></span>
-                        </p>
-                    <% } %>
                 </form>
+
+                <% if (typeof locals.message !== "undefined" && locals.message) { %>
+                    <p class="notice notice--error" role="alert">
+                        <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
+                        </svg>
+                        <span><%= locals.message %></span>
+                    </p>
+                <% } %>
             </div>
         </div>
+
+    <script>
+        /* If the first press on Login is swallowed — the password manager
+           commits its value on mousedown, then constraint validation cancels
+           the click — submit once that value is actually there. A click that
+           already submitted, or a still-empty field, is left alone. */
+        (function () {
+            var form = document.getElementById('login-form');
+            var password = document.getElementById('password');
+            var button = form && form.querySelector('button[type="submit"]');
+            if (!form || !password || !button) return;
+
+            var submitted = false;
+            var queued = false;
+            form.addEventListener('submit', function () { submitted = true; });
+            button.addEventListener('mousedown', function () {
+                if (queued || submitted) return;
+                queued = true;
+                window.setTimeout(function () {
+                    queued = false;
+                    if (submitted || !password.value) return;
+                    submitted = true;
+                    if (typeof form.requestSubmit === 'function') form.requestSubmit(button);
+                    else form.submit();
+                }, 0);
+            });
+        })();
+    </script>
 
 <%- include('partials/footer.ejs') %>
