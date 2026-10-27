@@ -87,7 +87,7 @@ MemoraFind runs on Node.js, EJS, Netlify Functions and Supabase. That stack is f
 * **Pages — `public/views/`.** Every page is an EJS template: `index.ejs` (the landing page), `search.ejs` (a cemetery's results), `grave.ejs` (one record), `update.ejs` (the administrator's lookup and edit form), `login.ejs` (the administrator login), and three states that used to be plain text — `cemetery-not-found.ejs`, `grave-not-found.ejs` and `grave-unavailable.ejs`.
 * **Shared partials — `public/views/partials/`.** `header.ejs` (document head plus site header and navigation), `footer.ejs` (footer and the small mobile-navigation script), `search-fields.ejs` (the reusable search form fields), `record-display.ejs` (the date, "Not recorded" and age rules, shared by the search card and the record page so the two cannot drift) and `fact-burial-location.ejs` (the burial-location fact, shared by the same two templates for the same reason).
 * **Server code — `netlify/functions/`.** One file per route. Each handler does its work and returns HTML rendered with `ejs.renderFile`. `findCemetery.js` is a shared helper that locates a record by Memorial ID across the three cemeteries — it is not a route. `baseRecord.js` is the other shared helper: it names each cemetery's base table and composes the date string the templates read.
-* **Data — Supabase.** The burial records and the administrator account live in Supabase. The functions read the project URL and key from the environment (see [Environment Variables](#environment-variables)).
+* **Data — Supabase.** The burial records live in Supabase. The functions read the project URL and key from the environment. Administrator sign-in is a signed session checked in the functions (see [Environment Variables](#environment-variables)).
 * **Records pipeline — `python-scraper/`.** A Python script using BeautifulSoup that parses the cemetery listing pages into the CSV files committed alongside it (`parsed_names_bcmg.csv`, `parsed_names_capernaum.csv`, `parsed_names_honeyford.csv`), which is where the records in the database came from. What the source pages do and do not contain is what decides what the site can show — see the burial-location issue below.
 * **Static assets — `public/`.** Stylesheets are served from `/css/...` and the cemetery photographs from `/assets/...`. `public/robots.txt` allows normal crawling and disallows `/.netlify/` (the function endpoints answer any caller, so they are kept out of the index), and `public/sitemap.xml` lists the landing page, the three cemetery search pages and **all 2,428 grave pages** (`/grave/<memorial id>`), so every person's page can be found by a search engine now that a cemetery search page lists nothing until a visitor searches. The sitemap is generated from the record CSVs, never edited by hand: run `node tools/build-sitemap.js` after the records change and commit the result (`node tools/build-sitemap.js --check` reports a stale file, and refuses to build at all if the CSVs no longer hold the 2,428 IDs 1000001–1002428 it expects).
 * **Contributor rules — `AGENTS.md`.** The short list of rules at the repository root: the frozen search form contract, the colour rule, "no invented data", and the fact that `netlify.toml` and the Supabase queries are changed only deliberately, with the owner's clearance.
@@ -154,11 +154,11 @@ The page is honest in each of its failure cases, and all of them keep the site's
 A visitor can look a record up and read it, but changing anything requires the administrator password:
 
 1. The record's **Record ID** (`memorial_id`) is shown on each search result card and on the record's own page. "Update a record" in the header and footer leads to the gate below.
-2. `/.netlify/functions/updatePage` is that gate: with no session cookie it renders the login page, and with a valid one it renders the update page.
-3. On the login page the administrator enters the password. `/.netlify/functions/login` checks it against the site's administrator account in Supabase and, on success, sets an `httpOnly` `token` cookie that expires after ten minutes and renders the update page. A wrong password re-renders the login page with a message.
-4. `/search/update` (served by `/.netlify/functions/getUpdateRecord`) is the lookup: the administrator enters a Memorial ID, and the function looks that record up across the three cemeteries and renders its current values into the edit form — or a message, if the ID matches nothing. A value that is not a number is answered as bad input ("A Memorial ID is a number, for example 1001728") rather than being sent to the database and reported as an outage.
-5. Submitting the edit form POSTs to `/.netlify/functions/updateRecord`, which requires the `token` cookie, writes only the fields that actually changed to Supabase, and re-renders the page with a success or an error message.
-6. `/.netlify/functions/logout` clears the cookie and redirects to `/`.
+2. `/.netlify/functions/updatePage` is that gate: with no valid session cookie it renders the login page, and with a signed session it renders the update page.
+3. On the login page the administrator enters the password. `/.netlify/functions/login` compares it with `ADMIN_PASSWORD_HASH` (or `ADMIN_PASSWORD`) using a constant-time check and, on success, sets an `HttpOnly`, `Secure`, `SameSite=Strict` `mf_session` cookie that expires after ten minutes. The cookie is HMAC-signed with `ADMIN_SESSION_SECRET`. A wrong password re-renders the login page. Repeated failures are locked out — see [Environment Variables](#environment-variables).
+4. `/search/update` (served by `/.netlify/functions/getUpdateRecord`) is the lookup, and it requires that same session. The administrator enters a Memorial ID, and the function looks that record up across the three cemeteries and renders its current values into the edit form — or a message, if the ID matches nothing. A value that is not a number is answered as bad input ("A Memorial ID is a number, for example 1001728") rather than being sent to the database and reported as an outage.
+5. Submitting the edit form POSTs to `/.netlify/functions/updateRecord`, which requires a valid session, writes only allowlisted fields that actually changed, and re-renders the page with a success or an error message. The write uses `SUPABASE_API_KEY` (see below).
+6. `/.netlify/functions/logout` clears the session cookie with the same attributes, forgets that session id in the function's memory, and redirects to `/`.
 
 **[Back to top](#table-of-contents)**
 
@@ -184,18 +184,47 @@ git clone git@github.com:dyarawilliams/MemoraFind.git
 
 ### Environment Variables
 
-The functions read two variables from the environment:
+Set these in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). None of the values are recorded in this repository. Public search needs the two Supabase variables. Administrator sign-in also needs the admin variables below — without them, login fails closed and no session cookie is issued.
 
 | Variable | Purpose |
 | --- | --- |
 | `SUPABASE_URL` | the Supabase project URL the functions query |
-| `SUPABASE_API_KEY` | the key the functions use to reach that project |
+| `SUPABASE_API_KEY` | the key the functions use to read records and to save administrator edits |
+| `ADMIN_EMAIL` | the administrator identity stored in the signed session. The login form posts a password only; this address is not typed in |
+| `ADMIN_PASSWORD` | the administrator password, compared in constant time. Ignored when `ADMIN_PASSWORD_HASH` is set |
+| `ADMIN_PASSWORD_HASH` | preferred over `ADMIN_PASSWORD`. A scrypt hash in the form `scrypt:<salt hex>:<key hex>` |
+| `ADMIN_SESSION_SECRET` | HMAC secret for the session cookie and the lockout cookie. At least 16 characters, random |
 
-Set both in the Netlify site's environment settings, or in a local `.env` file (`.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`). The values belong to the site's own Supabase project and are not recorded in this repository.
+Generate `ADMIN_PASSWORD_HASH` with Node's built-in scrypt (the same defaults the login check uses):
+
+```
+node -e "const c=require('crypto');const p=process.argv[1];const s=c.randomBytes(16);const k=c.scryptSync(p,s,32);console.log('scrypt:'+s.toString('hex')+':'+k.toString('hex'))" 'your-password'
+```
+
+**Session cookie.** On success, login sets `mf_session`: `HttpOnly`, `Secure`, `SameSite=Strict`, path `/`, ten-minute expiry, HMAC-SHA256 signed with `ADMIN_SESSION_SECRET`. `Secure` means the browser stores it on HTTPS, which is how Netlify serves production and deploy previews. Logout clears that cookie with the same attributes and forgets the session id in that isolate's memory.
+
+**Lockout.** Five failed attempts lock the client out for 15 minutes. The counter is kept in function memory (per client address, in that isolate) and in a signed `mf_fail` cookie, and the stricter of the two wins. This is best-effort on serverless: a new isolate starts with an empty memory counter, and a caller that drops the cookie avoids the copy it was holding. No Supabase table was added, so lockout does not need a schema change.
+
+**Saves and row-level security.** `updateRecord` writes with `SUPABASE_API_KEY`, not with a user JWT. That key has to be allowed to `UPDATE` (and `SELECT`) `bcmg_data`, `capernaum_data` and `honeyford_data`. A service-role key bypasses RLS. An anon key updates a row only when a policy allows it, and a policy that lets `anon` update these tables also lets anyone who has that key write straight to the Supabase API — so the key stays in Netlify's environment either way. Check what is in place before relying on a save:
+
+```sql
+select tablename, policyname, cmd, roles, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('bcmg_data', 'capernaum_data', 'honeyford_data')
+order by tablename, policyname;
+
+select grantee, table_name, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name in ('bcmg_data', 'capernaum_data', 'honeyford_data')
+  and privilege_type in ('SELECT', 'UPDATE')
+order by table_name, grantee, privilege_type;
+```
 
 ### Running It Locally
 
-`npm install` is all the setup the project needs, and the same two environment variables have to be present in the environment. Note that there is no local entry point in this repository: the `start` script in `package.json` points at a `server.js` that is not part of the repository, because every page is rendered by a Netlify Function rather than by a server checked in here. In practice a change is therefore checked on the Netlify deploy preview that Netlify builds for a branch or pull request, and the site itself is only ever served by Netlify.
+`npm install` is all the setup the project needs, and the environment variables above have to be present for the functions that read them. Note that there is no local entry point in this repository: the `start` script in `package.json` points at a `server.js` that is not part of the repository, because every page is rendered by a Netlify Function rather than by a server checked in here. In practice a change is therefore checked on the Netlify deploy preview that Netlify builds for a branch or pull request, and the site itself is only ever served by Netlify.
 
 ### Deploying
 
@@ -206,7 +235,7 @@ Deployment is done by Netlify from this repository. `netlify.toml` publishes `pu
 ## Known Issues and What Is Not Built Yet
 
 * **The burial location is missing from the source data.** Every record renders "Section and lot not recorded", and that is the honest answer: 2,425 of the 2,428 records have no section or lot at all, and the three that show a value show a wrong one that our own pattern-matching invented from unrelated words on the source page ("Section BAMBERG", "Section MARKER", "Section 2011"). The scraper reads Find a Grave's "Plot info" line, which for these three cemeteries contains only `bamberg county memory` or `Marker only` — so re-scraping would not produce a location. Until the plots are collected by hand (walking the cemeteries or working from photographs) or come from the cemeteries or the county library, the site cannot say where a grave is. The page never guesses: where a record does carry a section or lot it is shown, and otherwise the fact says it was not recorded.
-* **The administrator login-and-save path has never been tested end to end.** Every part of it exists and resolves, but no administrator account is held by the people who built it, so the path from entering the password, through `login`, `getUpdateRecord` and `updateRecord`, to a saved change has never been exercised against the live database. The pages before the gate have been checked; the save has not.
+* **The administrator save path has not been exercised against the live database.** The handlers are checked with a stub database (`node tools/verify-review-fixes.js`), including login, lockout, logout, a rejected anonymous save, the field allowlist and a missing cemetery. A real save still has to be confirmed on a deploy preview once Netlify has the admin variables and `SUPABASE_API_KEY` is allowed to update the three base tables.
 * **Photos, biographies and family connections are not built.** No photograph, biography or family relationship is stored in or read from the data, and none of them appear in the interface. They need new data structures in the Supabase project and a decision on who moderates a stranger's contribution to someone's memorial before any of it can start. The nearest the site comes today is the free-text `notes` and the `moved_from` / `moved_to` relocation fields, which a search card and a record page show under "More details" when the record actually carries one.
 
 **[Back to top](#table-of-contents)**

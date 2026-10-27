@@ -1,17 +1,39 @@
 const { createClient } = require('@supabase/supabase-js');
 const ejs = require('ejs');
 const path = require('path');
-//Used to validate logged-in users
-const cookie = require('cookie');
-//Used to parse POST requests
 const querystring = require('querystring');
 const { findCemetery } = require('./findCemetery');
+const { baseTableFor } = require('./baseRecord');
+const { requireAdmin } = require('./adminSession');
 
 //Columns the database holds as numbers. PostgREST hands them back as numbers
 //while an HTML form always posts strings, so they have to be compared as
 //numbers — compared as strings "1907" never equals 1907 and every submit looked
 //like a change to the dates.
 const NUMERIC_COLUMNS = ['birth_year', 'birth_day', 'death_year', 'death_day'];
+
+//The edit form's fields, and nothing else. memorial_id is the row to update,
+//not a column the form is allowed to change. A posted key that is not in this
+//map (notes, prefix, a column the form does not show) is ignored.
+const EDITABLE_FIELDS = {
+  first_name: { kind: 'text', max: 80, required: true },
+  middle_name: { kind: 'text', max: 80 },
+  maiden_name: { kind: 'text', max: 80 },
+  last_name: { kind: 'text', max: 80, required: true },
+  suffix: { kind: 'text', max: 20 },
+  is_vet: { kind: 'vet' },
+  birth_year: { kind: 'year' },
+  birth_month: { kind: 'text', max: 12 },
+  birth_day: { kind: 'day' },
+  death_year: { kind: 'year' },
+  death_month: { kind: 'text', max: 12 },
+  death_day: { kind: 'day' },
+  section: { kind: 'text', max: 80 },
+  lot: { kind: 'text', max: 40 }
+};
+
+const MEMORIAL_ID_PATTERN = /^\d{1,12}$/;
+const MAX_BODY_LENGTH = 20000;
 
 //An empty form field and an empty column mean the same thing.
 function isEmptyValue(value) {
@@ -58,9 +80,6 @@ function valueChanged(key, submitted, stored) {
   return String(submitted) !== String(stored);
 }
 
-//Thrown when the database accepts a write but changes no row. It is a different
-//failure from a rejected query, and it is reported to the volunteer in words of
-//its own instead of being passed off as a save.
 class NothingSavedError extends Error {
   constructor(message) {
     super(message);
@@ -68,185 +87,206 @@ class NothingSavedError extends Error {
   }
 }
 
+class FieldValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'FieldValidationError';
+  }
+}
+
+class RecordNotFoundError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'RecordNotFoundError';
+  }
+}
+
+function invalidText(value, max) {
+  if (value.length > max) return true;
+  return /[\u0000-\u001F\u007F<>]/.test(value);
+}
+
+function parseEmptyNumber(value) {
+  const text = String(value || '').trim();
+  if (text === '' || /^0+$/.test(text)) return { ok: true, empty: true, value: null };
+  return { ok: true, empty: false, text: text };
+}
+
+function parseField(spec, raw) {
+  if (Array.isArray(raw) || typeof raw !== 'string') return { ok: false };
+  if (spec.kind === 'vet') {
+    const text = raw.trim();
+    if (text === '') return { ok: true, value: null };
+    if (text === 'Y') return { ok: true, value: 'Y' };
+    return { ok: false };
+  }
+  if (spec.kind === 'text') {
+    const text = raw.trim();
+    if (text === '') {
+      if (spec.required) return { ok: false };
+      return { ok: true, value: null };
+    }
+    if (invalidText(text, spec.max)) return { ok: false };
+    return { ok: true, value: text };
+  }
+  const parsed = parseEmptyNumber(raw);
+  if (!parsed.ok) return { ok: false };
+  if (parsed.empty) return { ok: true, value: null };
+  if (spec.kind === 'day') {
+    if (!/^\d{1,2}$/.test(parsed.text)) return { ok: false };
+    const day = Number(parsed.text);
+    if (day < 1 || day > 31) return { ok: false };
+    return { ok: true, value: day };
+  }
+  if (spec.kind === 'year') {
+    if (!/^\d{4}$/.test(parsed.text)) return { ok: false };
+    const year = Number(parsed.text);
+    if (year < 1700 || year > 2100) return { ok: false };
+    return { ok: true, value: year };
+  }
+  return { ok: false };
+}
+
+function editableUpdates(formData) {
+  const updates = Object.create(null);
+  const names = Object.keys(EDITABLE_FIELDS);
+  for (let i = 0; i < names.length; i += 1) {
+    const name = names[i];
+    if (!Object.prototype.hasOwnProperty.call(formData, name)) continue;
+    const parsed = parseField(EDITABLE_FIELDS[name], formData[name]);
+    if (!parsed.ok) return { error: true };
+    updates[name] = parsed.value;
+  }
+  return { error: false, updates: updates };
+}
 
 async function updateRecordInSupabase(supabase, formData) {
-  try {
-    const memorial_id = formData.memorial_id;
+  const memorialId = typeof formData.memorial_id === 'string' ? formData.memorial_id.trim() : '';
+  if (!MEMORIAL_ID_PATTERN.test(memorialId)) {
+    throw new FieldValidationError('A Memorial ID is a number. The record was not saved.');
+  }
 
-    // Check if the memorial_id is valid
-    if (!memorial_id || isNaN(memorial_id)) {
-      throw new Error('Invalid or missing Memorial ID. Please provide a valid Memorial ID.');
-    }
-    // Check if their is a cemetery that exists for the given memorial_id
-    const cemetery = await findCemetery(memorial_id);
-    
-    // Split the cemetery name to get the table name for example if the cemetery is "capernaum_data_formatted_2" then the table name is "capernaum_data
-    const tableName = cemetery.split("_", 2).join("_");
-    
-    // Check if the cemetery name is valid
+  const edited = editableUpdates(formData);
+  if (edited.error) {
+    throw new FieldValidationError('The record was not saved. One of the fields is missing or not valid.');
+  }
+
+  try {
+    const cemetery = await findCemetery(memorialId);
+    // The view name has to be checked before it is used. Splitting a null
+    // cemetery threw, and the handler turned that into a generic save error.
     if (!cemetery) {
-      throw new Error(`Cemetery not found for memorial ID ${memorial_id}`);
+      throw new RecordNotFoundError('Memorial ID ' + memorialId + ' was not found in any cemetery.');
     }
-    
-    // Check if the table name is valid
+
+    const tableName = baseTableFor(cemetery);
     if (!tableName) {
+      console.error('Refusing update for unknown cemetery view', cemetery);
       throw new Error('Invalid table name');
     }
 
-   // Fetch the current record from the database to compare against submitted data
     const { data: currentData, error: fetchError } = await supabase
       .from(tableName)
       .select('*')
-      .eq('memorial_id', memorial_id)
+      .eq('memorial_id', memorialId)
       .single();
-    
-    // If there is an error checking the record, throw an error
+
     if (fetchError) {
       throw fetchError;
     }
-    
-    // If the record does not exist, throw an error
+
     if (!currentData) {
-      throw new Error(`Memorial ID ${memorial_id} not found in cemetery ${cemetery}.`);
+      throw new RecordNotFoundError('Memorial ID ' + memorialId + ' was not found in ' + tableName + '.');
     }
 
-    // Construct the update payload with only changed fields by comparing against old record
     const updatePayload = {};
-
-    // Loop through formData and compare with currentData
-    for (const key in formData) {
-      // Skip the memorial_id field
-      if (key === 'memorial_id') {
-        continue;
-      }
-
-      // Normalize null values in currentData
-      currentData[key] = currentData[key] === null ? "" : currentData[key];
-
-      // Check if the field exists in formData and has changed
-      if (formData[key] !== undefined && valueChanged(key, formData[key], currentData[key])) {
-        // Add to update payload only if the value has changed
-        if (formData[key] === '' && currentData[key] === "") {
-          updatePayload[key] = null; // Keep it as null if both are effectively empty
-        } else {
-          updatePayload[key] = formData[key] === '' ? null : formData[key];
-        }
+    const names = Object.keys(edited.updates);
+    for (let i = 0; i < names.length; i += 1) {
+      const key = names[i];
+      if (valueChanged(key, edited.updates[key], currentData[key])) {
+        updatePayload[key] = edited.updates[key];
       }
     }
-    // console.log('Update payload:', updatePayload);
+
     if (Object.keys(updatePayload).length === 0) {
-      //Nothing differed from what is stored, so nothing is written and no save
-      //is reported either. The handler answers on `fieldsChanged`.
-      return { fieldsChanged: false, data: currentData };
+      return { fieldsChanged: false, data: currentData, memorialId: memorialId };
     }
 
-    // Perform the update with the constructed payload, and ask for the rows the
-    // database actually changed. Without .select() the answer carries no rows at
-    // all, so a write that no policy permits — Supabase reports that as no error
-    // and zero rows — could not be told apart from a real save.
+    // Ask for the rows the database actually changed. Without .select() the
+    // answer carries no rows at all, so a write that no policy permits —
+    // Supabase reports that as no error and zero rows — could not be told
+    // apart from a real save. select('*') is the whole row: a named column
+    // list is what previously rejected reads when a column was absent.
     const { data: updatedRows, error: updateError } = await supabase
       .from(tableName)
       .update(updatePayload)
-      .eq('memorial_id', memorial_id)
-      .select('memorial_id');
+      .eq('memorial_id', memorialId)
+      .select('*');
 
     if (updateError) {
       console.error('Error updating record:', updateError);
       throw new Error('Failed to update the record. Please try again.');
     }
 
-    // Zero rows changed: the request was accepted, nothing was stored.
     if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
-      throw new NothingSavedError(`The database accepted the update for memorial ID ${memorial_id} in ${tableName} but changed no rows.`);
+      throw new NothingSavedError('The database accepted the update for memorial ID ' + memorialId + ' in ' + tableName + ' but changed no rows.');
     }
 
-    return { fieldsChanged: true, data: updatedRows };
+    return { fieldsChanged: true, data: updatedRows, memorialId: memorialId };
   } catch (error) {
-    console.error('Error updating record in Supabase:', error);
+    if (!error || (error.name !== 'RecordNotFoundError' && error.name !== 'NothingSavedError')) {
+      console.error('Error updating record in Supabase:', error);
+    }
     throw error;
   }
 }
 
-exports.handler = async function (event, context) {
-  // Parse cookies from the request headers
-  const cookies = cookie.parse(event.headers.cookie || '');
-  const token = cookies.token;
+async function renderUpdate(message, statusCode) {
+  const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
+  const html = await ejs.renderFile(templatePath, { record: null, message: message });
+  return {
+    statusCode: statusCode,
+    headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
+    body: html
+  };
+}
 
-  //Add the token to the supabase headers to authenticate against DB policy
-  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  });
+exports.handler = async function (event) {
+  const gate = await requireAdmin(event || {}, 401);
+  if (gate.response) return gate.response;
 
-  //If the token has expired, send the user back to the login page
-  if (!token) {
-    const templatePath = path.resolve(__dirname, '../../public/views/login.ejs');
-    const html = await ejs.renderFile(templatePath, { message: 'Session has timed out. Please log in again.' });
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'text/html' },
-      body: html
-    };
+  if (event.httpMethod && event.httpMethod !== 'POST') {
+    return renderUpdate('The record was not saved.', 405);
   }
 
-  //Get the update information from the POST request
-  const formData = querystring.parse(event.body);
+  if (event.body && event.body.length > MAX_BODY_LENGTH) {
+    return renderUpdate('The record was not saved. One of the fields is missing or not valid.', 400);
+  }
+
+  const formData = querystring.parse(event.body || '');
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
 
   try {
-    memorial_id = formData.memorial_id;
-    // Try to update the database (see function definition)
     const result = await updateRecordInSupabase(supabase, formData);
-
-    const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
-
-    // The submit matched what is already stored, so no write was made: say that
-    // rather than reporting an update that never happened.
     if (result && result.fieldsChanged === false) {
-      const html = await ejs.renderFile(templatePath, { record: null, message: 'No fields were changed, so the record was left as it is.'});
-
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'text/html' },
-        body: html
-      };
+      return renderUpdate('No fields were changed, so the record was left as it is.', 200);
     }
-
-    // If it worked, show the memorial ID to the user
-    const html = await ejs.renderFile(templatePath, { record: null, message: `Record ${memorial_id} has been updated successfully.`});
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'text/html' },
-      body: html
-    };
+    return renderUpdate('Record ' + result.memorialId + ' has been updated successfully.', 200);
   } catch (error) {
-
-    // If it didn't work, show a error message to the user.
-    console.error('Error updating record:', error);
-    const templatePath = path.resolve(__dirname, '../../public/views/update.ejs');
-
-    // The database took the write but changed no row. Nothing was saved, and
-    // that is what the volunteer is told: this is the case that used to answer
-    // "has been updated successfully." with no error and zero rows written.
-    if (error && error.name === 'NothingSavedError') {
-      const html = await ejs.renderFile(templatePath, { record: null, message: 'Nothing was saved. The database did not change this record. Please check the record is still there, and tell a library administrator if this happens again.' });
-
-      return {
-        statusCode: 500,
-        headers: { 'Content-Type': 'text/html' },
-        body: html
-      };
+    if (error && error.name === 'FieldValidationError') {
+      return renderUpdate(error.message, 400);
     }
 
-    const html = await ejs.renderFile(templatePath, { record: null, message: 'Error Updating Record. Please try again.' });
+    if (error && error.name === 'RecordNotFoundError') {
+      return renderUpdate(error.message, 404);
+    }
 
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'text/html' },
-      body: html
-    };
+    if (error && error.name === 'NothingSavedError') {
+      console.error('Update changed no rows:', error.message);
+      return renderUpdate('Nothing was saved. The database did not change this record. Please check the record is still there, and tell a library administrator if this happens again.', 500);
+    }
+
+    console.error('Error updating record:', error && error.message ? error.message : error);
+    return renderUpdate('Error Updating Record. Please try again.', 500);
   }
 };
