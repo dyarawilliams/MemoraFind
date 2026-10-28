@@ -23,6 +23,8 @@
     <meta name="twitter:title" content="Page not found — MemoraFind" />
     <meta name="twitter:description" content="This address is not a page on MemoraFind. Search Bamberg County burial records by name, or open one of the three cemeteries." />
     <meta name="twitter:image" content="https://memorafind.com/assets/og-card.png" />
+    
+    
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235c0f12'/%3E%3Cpath d='M7 26V15a9 9 0 0 1 18 0v11' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 19h8M12 23h5' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/styles.css" />
@@ -184,6 +186,64 @@
             /* Leaving the mobile breakpoint resets the state. */
             window.addEventListener('resize', function () {
                 if (window.innerWidth >= 860) setOpen(false);
+            });
+        })();
+    </script>
+    <script>
+        /* Browser errors go to the log function. Five reports per page, and the
+           function itself caps size and rate. The path is the pathname only.
+           A failure to report is ignored so this script cannot raise another. */
+        (function () {
+            var endpoint = '/.netlify/functions/logClientError';
+            var sent = 0;
+
+            function report(payload) {
+                if (sent >= 5) return;
+                sent += 1;
+                var body;
+                try {
+                    body = JSON.stringify(payload);
+                } catch (ignore) {
+                    return;
+                }
+                if (body.length > 3500) body = body.slice(0, 3500);
+                try {
+                    if (navigator.sendBeacon) {
+                        var queued = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+                        if (queued) return;
+                    }
+                } catch (ignoreBeacon) {}
+                try {
+                    fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: body,
+                        keepalive: true
+                    }).catch(function () {});
+                } catch (ignoreFetch) {}
+            }
+
+            window.onerror = function (message, source, lineno, colno, error) {
+                report({
+                    kind: 'error',
+                    message: message == null ? '' : String(message).slice(0, 500),
+                    source: source == null ? '' : String(source).slice(0, 200),
+                    lineno: lineno || 0,
+                    colno: colno || 0,
+                    stack: error && error.stack ? String(error.stack).slice(0, 1500) : '',
+                    path: location.pathname || '/'
+                });
+            };
+
+            window.addEventListener('unhandledrejection', function (event) {
+                var reason = event && event.reason;
+                var message = (reason && reason.message) ? reason.message : String(reason == null ? '' : reason);
+                report({
+                    kind: 'unhandledrejection',
+                    message: String(message).slice(0, 500),
+                    stack: reason && reason.stack ? String(reason.stack).slice(0, 1500) : '',
+                    path: location.pathname || '/'
+                });
             });
         })();
     </script>

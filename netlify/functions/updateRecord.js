@@ -5,6 +5,7 @@ const querystring = require('querystring');
 const { findCemetery } = require('./findCemetery');
 const { baseTableFor } = require('./baseRecord');
 const { requireAdmin } = require('./adminSession');
+const { reportError, logError, flushErrorReporting } = require('./errorReport');
 
 //Columns the database holds as numbers. PostgREST hands them back as numbers
 //while an HTML form always posts strings, so they have to be compared as
@@ -138,7 +139,14 @@ function cacheIsFresh() {
 }
 
 function failSignIn() {
-  console.error('Supabase admin sign-in failed');
+  // Do not pass the auth error through. A rejected request can include the
+  // password. reportError writes the line before the throw; the handler
+  // flushes any optional Sentry delivery before it responds.
+  reportError({
+    functionName: 'updateRecord',
+    path: '/.netlify/functions/updateRecord',
+    message: 'Supabase admin sign-in failed'
+  });
   throw new AdminSignInError('Supabase admin sign-in failed');
 }
 
@@ -309,7 +317,10 @@ async function updateRecordInSupabase(formData) {
 
     const tableName = baseTableFor(cemetery);
     if (!tableName) {
-      console.error('Refusing update for unknown cemetery view', cemetery);
+      await logError({
+        functionName: 'updateRecord',
+        message: 'Refusing update for unknown cemetery view'
+      });
       throw new Error('Invalid table name');
     }
 
@@ -361,7 +372,11 @@ async function updateRecordInSupabase(formData) {
     const updateError = updated && updated.error;
 
     if (updateError) {
-      console.error('Error updating record:', updateError);
+      await logError({
+        functionName: 'updateRecord',
+        error: updateError,
+        message: 'Error updating record'
+      });
       throw new Error('Failed to update the record. Please try again.');
     }
 
@@ -372,7 +387,11 @@ async function updateRecordInSupabase(formData) {
     return { fieldsChanged: true, data: updatedRows, memorialId: memorialId };
   } catch (error) {
     if (!error || (error.name !== 'RecordNotFoundError' && error.name !== 'NothingSavedError' && error.name !== 'AdminSignInError')) {
-      console.error('Error updating record in Supabase:', error);
+      await logError({
+        functionName: 'updateRecord',
+        error: error,
+        message: 'Error updating record in Supabase'
+      });
     }
     throw error;
   }
@@ -418,15 +437,26 @@ exports.handler = async function (event) {
     }
 
     if (error && error.name === 'NothingSavedError') {
-      console.error('Update changed no rows:', error.message);
+      await logError({
+        functionName: 'updateRecord',
+        event: event,
+        error: error,
+        message: 'Update changed no rows'
+      });
       return renderUpdate('Nothing was saved. The database did not change this record. Please check the record is still there, and tell a library administrator if this happens again.', 500);
     }
 
     if (error && error.name === 'AdminSignInError') {
+      await flushErrorReporting();
       return renderUpdate('Error Updating Record. Please try again.', 500);
     }
 
-    console.error('Error updating record:', error && error.message ? error.message : error);
+    await logError({
+      functionName: 'updateRecord',
+      event: event,
+      error: error,
+      message: 'Error updating record'
+    });
     return renderUpdate('Error Updating Record. Please try again.', 500);
   }
 };

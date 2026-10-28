@@ -96,6 +96,43 @@
       return parts ? parts.year : null;
   }
 
+  var MONTH_NUMBER = {
+      jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+      jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
+  };
+
+  /* An ISO 8601 date for structured data, or null when the record has no year.
+     A month or a day that was never recorded is left out ("1930", "2008-09")
+     rather than filled in. A day is used only with its month. */
+  function isoDate(raw) {
+      var parts = recordedDateParts(raw);
+      if (!parts || !parts.year) return null;
+
+      var month = null;
+      if (parts.month) {
+          if (MONTH_NAME.test(parts.month)) {
+              month = MONTH_NUMBER[parts.month.slice(0, 3).toLowerCase()] || null;
+          } else if (DATE_PART.test(parts.month)) {
+              var monthNumber = parseInt(parts.month, 10);
+              if (monthNumber >= 1 && monthNumber <= 12) {
+                  month = (monthNumber < 10 ? "0" : "") + monthNumber;
+              }
+          }
+      }
+
+      var day = null;
+      if (month && parts.day && DATE_PART.test(parts.day)) {
+          var dayNumber = parseInt(parts.day, 10);
+          if (dayNumber >= 1 && dayNumber <= 31) {
+              day = (dayNumber < 10 ? "0" : "") + dayNumber;
+          }
+      }
+
+      if (month && day) return parts.year + "-" + month + "-" + day;
+      if (month) return parts.year + "-" + month;
+      return parts.year;
+  }
+
   /* The view computes 0 for an age it could not work out (and for a death in
      the same year as the birth). A 0 is never printed as an age. */
   function formatRecordedAge(raw) {
@@ -107,6 +144,7 @@
 
   __display.formatRecordedDate = formatRecordedDate;
   __display.recordedYear = recordedYear;
+  __display.isoDate = isoDate;
   __display.formatRecordedAge = formatRecordedAge;
   __display.MISSING_TEXT = "Not recorded";
 %>

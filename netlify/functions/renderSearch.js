@@ -9,6 +9,7 @@ const path = require("path");
 // this, because the card read the *_data_formatted_2 view and the page read the
 // base table.
 const { baseTableForCemetery, displayRecord } = require('./baseRecord');
+const { logError, friendlyError } = require('./errorReport');
 
 // Connect to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -197,12 +198,11 @@ exports.handler = async function (event, context) {
         // The database could not be read. Say so plainly rather than showing an
         // empty result list, which would read as "no such person"; the real
         // Supabase error stays in the function log, never in the response body.
-        console.error("Error querying database:", error);
-        console.error("Supabase error details:", {
-            code: error && error.code,
-            message: error && error.message,
-            details: error && error.details,
-            hint: error && error.hint,
+        await logError({
+            functionName: "renderSearch",
+            event: event,
+            error: error,
+            message: "Error querying database"
         });
 
         return renderSearchPage({
@@ -243,11 +243,11 @@ async function renderSearchPage(locals) {
             body: html,
         };
     } catch (error) {
-        console.error("Error rendering search.ejs:", error);
-        return {
-            statusCode: 500,
-            body: "Internal Server Error",
-        };
+        return friendlyError({
+            functionName: "renderSearch",
+            error: error,
+            message: "Error rendering search.ejs"
+        });
     }
 }
 
@@ -267,12 +267,12 @@ async function renderCemeteryNotFoundPage(requestedSlug) {
             body: html,
         };
     } catch (error) {
-        console.error("Error rendering cemetery-not-found.ejs:", error);
-        return {
+        return friendlyError({
+            functionName: "renderSearch",
+            error: error,
             statusCode: 404,
-            headers: { "Content-Type": "text/plain" },
-            body: "Cemetery not found",
-        };
+            message: "Error rendering cemetery-not-found.ejs"
+        });
     }
 }
 

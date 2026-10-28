@@ -13,6 +13,7 @@ const {
   renderLogin,
   htmlResponse
 } = require('./adminSession');
+const { logError, friendlyError } = require('./errorReport');
 
 const LOGIN_FAILED = 'Login failed. Please try again or contact a library administrator.';
 const LOCKED_OUT = 'Too many attempts. Please wait 15 minutes and try again.';
@@ -29,7 +30,11 @@ async function handleLogin(event) {
   }
 
   if (!authConfigured()) {
-    console.error('Admin login is not configured. Set ADMIN_EMAIL, ADMIN_SESSION_SECRET (16+ characters), and ADMIN_PASSWORD or ADMIN_PASSWORD_HASH.');
+    await logError({
+      functionName: 'login',
+      event: event,
+      message: 'Admin login is not configured. Set ADMIN_EMAIL, ADMIN_SESSION_SECRET (16+ characters), and ADMIN_PASSWORD or ADMIN_PASSWORD_HASH.'
+    });
     return renderLogin(LOGIN_FAILED, 500);
   }
 
@@ -50,7 +55,11 @@ async function handleLogin(event) {
 
   const issued = establishSession();
   if (!issued) {
-    console.error('Admin session could not be signed.');
+    await logError({
+      functionName: 'login',
+      event: event,
+      message: 'Admin session could not be signed.'
+    });
     return renderLogin(LOGIN_FAILED, 500);
   }
 
@@ -63,11 +72,11 @@ exports.handler = async function (event) {
   try {
     return await handleLogin(event || {});
   } catch (error) {
-    console.error('Login failed', error && error.message);
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
-      body: 'Internal Server Error'
-    };
+    return friendlyError({
+      functionName: 'login',
+      event: event,
+      error: error,
+      message: 'Login failed'
+    });
   }
 };

@@ -11,7 +11,11 @@
   var requestedId = (typeof locals.requestedId === "string") ? locals.requestedId : "";
   var pageTitle = "This record could not be read — MemoraFind";
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: pageTitle,
+      pageDescription: 'This burial record could not be read just now. Try the same address again shortly.',
+      canonicalPath: (/^\d+$/.test(requestedId) ? '/grave/' + requestedId : false)
+    }) %>
 
         <div class="page page--narrow">
             <div class="container">

@@ -44,6 +44,9 @@
   var totalKnown = (didSearch && reportedTotal !== null && reportedTotal > rows.length) ? reportedTotal : null;
   var moreMayExist = didSearch && reportedTotal === null && rows.length >= resultLimit;
   var pageTitle = (cemeteryName ? cemeteryName + " — Search records" : "Search records") + " — MemoraFind";
+  var pageDescription = cemeteryName
+      ? ("Search burial records for " + cemeteryName + " in Bamberg County, South Carolina by name, maiden name, birth year or death year.")
+      : "Search Bamberg County, South Carolina burial records by name, maiden name, birth year or death year.";
 
   /* Dates, age and the "Not recorded" wording come from
      partials/record-display.ejs — the same rules the single-record page
@@ -60,7 +63,11 @@
     { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
   ];
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle, canonicalPath: (cemeteryCode ? "/search/" + cemeteryCode : "/") }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: pageTitle,
+      pageDescription: pageDescription,
+      canonicalPath: (cemeteryCode ? "/search/" + cemeteryCode : "/")
+    }) %>
 
         <div class="page">
             <div class="container">

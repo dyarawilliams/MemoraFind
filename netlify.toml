@@ -37,5 +37,13 @@
   status = 200
   force = true
 
+# The sitemap is built from the burial records on each request. force is set
+# so a static public/sitemap.xml cannot shadow the function.
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/sitemap"
+  status = 200
+  force = true
+
 [functions]
   included_files = ["public/views/**"]
