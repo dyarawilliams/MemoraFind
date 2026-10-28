@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest an improvement to the grave finder.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        MemoraFind is a free grave finder for Bamberg County, South Carolina. The stack (Node.js, EJS, Netlify Functions, Supabase) is fixed. Describe the problem before the solution, and do not include secrets.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is difficult or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other approaches you considered.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Links, examples, or anything else that helps.
+    validations:
+      required: false
