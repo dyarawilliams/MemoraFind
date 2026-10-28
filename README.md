@@ -297,7 +297,7 @@ Contact me at dyara.williams@gmail.com for help with this project.
 
 ## Contributing
 
-Contributions are welcome. Open an issue or a pull request on [GitHub](https://github.com/dyarawilliams/MemoraFind). There is no `CONTRIBUTING.md` or code of conduct in the repository yet, and the stack (Node.js + EJS + Supabase + Netlify Functions, with no build step) is fixed, so please raise anything larger than a fix in an issue first. `AGENTS.md` at the repository root lists the rules a change has to keep to — the frozen search form contract, the colour rule, and "never print a placeholder as if it were data".
+Contributions are welcome. Open an issue or a pull request on [GitHub](https://github.com/dyarawilliams/MemoraFind). When you open an issue, use one of the forms in `.github/ISSUE_TEMPLATE/`: a bug report, a feature request, or a correction for a wrong or missing burial record. There is no `CONTRIBUTING.md` or code of conduct in the repository yet, and the stack (Node.js + EJS + Supabase + Netlify Functions, with no build step) is fixed, so please raise anything larger than a fix in an issue first. `AGENTS.md` at the repository root lists the rules a change has to keep to — the frozen search form contract, the colour rule, and "never print a placeholder as if it were data".
 
 **[Back to top](#table-of-contents)**
 
