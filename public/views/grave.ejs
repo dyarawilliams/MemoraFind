@@ -82,8 +82,41 @@
   var pageDescription = [nameText, lifeText.join(", "), cemeteryName]
       .filter(function (part) { return part !== ""; }).join(" — ")
       + ". Record ID " + memorialId + ". Burial records for Bamberg County, South Carolina.";
+
+  /* Person structured data. A date or a cemetery the record does not carry is
+     left out — never a zero, never a guessed section or lot. The name is the
+     same string as the title: given names, maiden name, surname, and a comma
+     only before a suffix. "<" is escaped so a name cannot close the script. */
+  var person = { "@context": "https://schema.org", "@type": "Person" };
+  if (nameText) person.name = nameText;
+  if (/^\d+$/.test(memorialId)) person.url = "https://memorafind.com/grave/" + memorialId;
+  var birthIso = display.isoDate(record.birth_date);
+  var deathIso = display.isoDate(record.death_date);
+  if (birthIso) person.birthDate = birthIso;
+  if (deathIso) person.deathDate = deathIso;
+  if (cemeteryName) {
+      person.burialPlace = {
+          "@type": "Cemetery",
+          "name": cemeteryName,
+          "containedInPlace": {
+              "@type": "AdministrativeArea",
+              "name": "Bamberg County, South Carolina"
+          }
+      };
+  }
+  var jsonLd = JSON.stringify(person)
+      .replace(/</g, "\\u003c")
+      .replace(/>/g, "\\u003e")
+      .replace(/&/g, "\\u0026")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle, pageDescription: pageDescription, canonicalPath: (memorialId ? "/grave/" + memorialId : "/") }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: pageTitle,
+      pageDescription: pageDescription,
+      canonicalPath: (memorialId ? "/grave/" + memorialId : "/"),
+      jsonLd: jsonLd
+    }) %>
 
         <div class="page page--narrow">
             <div class="container">

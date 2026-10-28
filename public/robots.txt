@@ -1,11 +1,21 @@
 # MemoraFind — https://memorafind.com
-# The public pages (/, /search/bcmg, /search/capernaum, /search/honeyford and
-# every /grave/<memorial id> record page listed in sitemap.xml) are open to
-# normal crawling. The function endpoints under /.netlify/ are
-# internal to the site and are not meant to be crawled, so they are disallowed.
+# The public pages (/, /contact, /search/bcmg, /search/capernaum,
+# /search/honeyford and every /grave/<memorial id> record page listed in
+# sitemap.xml) are open to normal crawling.
+#
+# /.netlify/ is disallowed because every function answers any caller. The
+# admin routes are named again below, including /search/update, which is not
+# under /.netlify/. The client error log is not a page.
 
 User-agent: *
 Allow: /
 Disallow: /.netlify/
+Disallow: /.netlify/functions/updatePage
+Disallow: /.netlify/functions/login
+Disallow: /.netlify/functions/logout
+Disallow: /.netlify/functions/updateRecord
+Disallow: /.netlify/functions/getUpdateRecord
+Disallow: /.netlify/functions/logClientError
+Disallow: /search/update
 
 Sitemap: https://memorafind.com/sitemap.xml

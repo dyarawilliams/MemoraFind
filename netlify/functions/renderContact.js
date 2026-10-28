@@ -1,5 +1,6 @@
 const ejs = require('ejs');
 const path = require('path');
+const { friendlyError } = require('./errorReport');
 
 exports.handler = async (event, context) => {
   try {
@@ -17,10 +18,11 @@ exports.handler = async (event, context) => {
 
     // Handle failure
   } catch (error) {
-    console.error('Error rendering contact.ejs:', error.message);
-    return {
-      statusCode: 500,
-      body: 'Internal Server Error'
-    };
+    return friendlyError({
+      functionName: 'renderContact',
+      event: event,
+      error: error,
+      message: 'Error rendering contact.ejs'
+    });
   }
 };

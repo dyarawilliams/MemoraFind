@@ -22,7 +22,14 @@
     { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
   ];
 %>
-<%- include('partials/header.ejs', { pageTitle: pageTitle }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: pageTitle,
+      pageDescription: isMalformed
+          ? 'That address is not a MemoraFind record ID. A record ID is a number, for example 1001728.'
+          : 'No Bamberg County burial record uses that record ID.',
+      canonicalPath: false,
+      noindex: true
+    }) %>
 
         <div class="page page--narrow">
             <div class="container">

@@ -70,5 +70,63 @@
             });
         })();
     </script>
+    <script>
+        /* Browser errors go to the log function. Five reports per page, and the
+           function itself caps size and rate. The path is the pathname only.
+           A failure to report is ignored so this script cannot raise another. */
+        (function () {
+            var endpoint = '/.netlify/functions/logClientError';
+            var sent = 0;
+
+            function report(payload) {
+                if (sent >= 5) return;
+                sent += 1;
+                var body;
+                try {
+                    body = JSON.stringify(payload);
+                } catch (ignore) {
+                    return;
+                }
+                if (body.length > 3500) body = body.slice(0, 3500);
+                try {
+                    if (navigator.sendBeacon) {
+                        var queued = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+                        if (queued) return;
+                    }
+                } catch (ignoreBeacon) {}
+                try {
+                    fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: body,
+                        keepalive: true
+                    }).catch(function () {});
+                } catch (ignoreFetch) {}
+            }
+
+            window.onerror = function (message, source, lineno, colno, error) {
+                report({
+                    kind: 'error',
+                    message: message == null ? '' : String(message).slice(0, 500),
+                    source: source == null ? '' : String(source).slice(0, 200),
+                    lineno: lineno || 0,
+                    colno: colno || 0,
+                    stack: error && error.stack ? String(error.stack).slice(0, 1500) : '',
+                    path: location.pathname || '/'
+                });
+            };
+
+            window.addEventListener('unhandledrejection', function (event) {
+                var reason = event && event.reason;
+                var message = (reason && reason.message) ? reason.message : String(reason == null ? '' : reason);
+                report({
+                    kind: 'unhandledrejection',
+                    message: String(message).slice(0, 500),
+                    stack: reason && reason.stack ? String(reason.stack).slice(0, 1500) : '',
+                    path: location.pathname || '/'
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

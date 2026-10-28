@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const ejs = require('ejs');
 const path = require('path');
+const { logError } = require('./errorReport');
 
 /*
  * Administrator session and lockout.
@@ -211,7 +212,10 @@ async function verifyScrypt(password, stored) {
     if (actual.length !== expected.length) return false;
     return crypto.timingSafeEqual(actual, expected);
   } catch (error) {
-    console.error('Password hash check failed');
+    await logError({
+      functionName: 'adminSession',
+      message: 'Password hash check failed'
+    });
     return false;
   }
 }

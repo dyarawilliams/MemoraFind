@@ -12,7 +12,12 @@
     { code: "honeyford", name: "Honey Ford Cemetery", short: "Honey Ford" }
   ];
 %>
-<%- include('partials/header.ejs', { pageTitle: 'Cemetery not found — MemoraFind' }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: 'Cemetery not found — MemoraFind',
+      pageDescription: 'That address is not one of the three cemeteries MemoraFind searches in Bamberg County, South Carolina.',
+      canonicalPath: false,
+      noindex: true
+    }) %>
 
         <div class="page">
             <div class="container">

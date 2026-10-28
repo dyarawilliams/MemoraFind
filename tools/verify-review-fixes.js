@@ -14,9 +14,11 @@
  * logout, a rejected anonymous save, the field allowlist, and a missing
  * cemetery. The save's Supabase Auth sign-in is stubbed as well: a successful
  * sign-in attaches an access token to the update, and a failed sign-in is an
- * error. No request leaves this process. The address is TEST_ADMIN_EMAIL,
- * not a real Supabase user. This script sets the admin environment variables
- * itself.
+ * error. The sitemap, the record page's description and structured data, and
+ * the error log are checked here too. Sentry's HTTP send is replaced for the
+ * duration of that check. No request leaves this process. The address is
+ * TEST_ADMIN_EMAIL, not a real Supabase user. This script sets the admin
+ * environment variables itself.
  */
 
 'use strict';
@@ -263,6 +265,7 @@ process.env.ADMIN_PASSWORD = ADMIN_PASSWORD;
 process.env.SUPABASE_ADMIN_PASSWORD = SUPABASE_ADMIN_PASSWORD;
 process.env.ADMIN_SESSION_SECRET = 'test-session-secret-0123456789';
 delete process.env.ADMIN_PASSWORD_HASH;
+delete process.env.SENTRY_DSN;
 
 const baseRecord = require('../netlify/functions/baseRecord');
 const renderSearch = require('../netlify/functions/renderSearch');
@@ -273,6 +276,11 @@ const logout = require('../netlify/functions/logout');
 const updatePage = require('../netlify/functions/updatePage');
 const updateRecord = require('../netlify/functions/updateRecord');
 const adminSession = require('../netlify/functions/adminSession');
+const renderIndex = require('../netlify/functions/renderIndex');
+const renderContact = require('../netlify/functions/renderContact');
+const sitemap = require('../netlify/functions/sitemap');
+const logClientError = require('../netlify/functions/logClientError');
+const errorReport = require('../netlify/functions/errorReport');
 
 function reset(partial) {
   calls.length = 0;
@@ -350,6 +358,58 @@ function cookieFlags(value) {
     && value.indexOf('Secure') !== -1
     && value.indexOf('SameSite=Strict') !== -1
     && value.indexOf('Path=/') !== -1;
+}
+
+function metaContent(html, attribute, name) {
+  const pattern = new RegExp('<meta\\s+' + attribute + '="' + name + '"\\s+content="([^"]*)"', 'i');
+  const match = String(html || '').match(pattern);
+  return match ? match[1] : '';
+}
+
+function canonicalHref(html) {
+  const match = String(html || '').match(/<link rel="canonical" href="([^"]*)"/);
+  return match ? match[1] : '';
+}
+
+function titleText(html) {
+  const match = String(html || '').match(/<title>([^<]*)<\/title>/);
+  return match ? match[1] : '';
+}
+
+function jsonLd(html) {
+  const match = String(html || '').match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  if (!match) return null;
+  return JSON.parse(match[1]);
+}
+
+function sitemapLocs(xml) {
+  const locs = [];
+  const pattern = /<loc>([^<]*)<\/loc>/g;
+  let match = pattern.exec(xml);
+  while (match) {
+    locs.push(match[1]);
+    match = pattern.exec(xml);
+  }
+  return locs;
+}
+
+async function captureLogs(run) {
+  const lines = [];
+  const original = console.error;
+  console.error = function () {
+    const parts = [];
+    for (let i = 0; i < arguments.length; i += 1) {
+      const part = arguments[i];
+      parts.push(typeof part === 'string' ? part : JSON.stringify(part));
+    }
+    lines.push(parts.join(' '));
+    return original.apply(console, arguments);
+  };
+  try {
+    return { result: await run(), lines: lines };
+  } finally {
+    console.error = original;
+  }
 }
 
 function responseCarriesSecret(response) {
@@ -910,6 +970,23 @@ async function main() {
   check('a failed Supabase sign-in is logged once', failureLines.length === 1);
   check('a failed Supabase sign-in does not log the password, email, or token', failureLog.indexOf(SUPABASE_ADMIN_PASSWORD) === -1 && failureLog.indexOf(ADMIN_PASSWORD) === -1 && failureLog.indexOf(TEST_ADMIN_EMAIL) === -1 && failureLog.indexOf(STUB_ACCESS_TOKEN) === -1);
   check('a failed Supabase sign-in response has no token', responseCarriesSecret(failedSignIn) === false);
+  let signInEntry = null;
+  try {
+    signInEntry = JSON.parse(failureLines[0] || '');
+  } catch (error) {
+    signInEntry = null;
+  }
+  check(
+    'a failed Supabase sign-in log is one JSON object with function, path, message and timestamp',
+    Boolean(signInEntry)
+      && signInEntry.level === 'error'
+      && signInEntry.function === 'updateRecord'
+      && signInEntry.path === '/.netlify/functions/updateRecord'
+      && signInEntry.message === 'Supabase admin sign-in failed'
+      && signInEntry.stack === null
+      && typeof signInEntry.timestamp === 'string'
+      && signInEntry.timestamp.indexOf('T') !== -1
+  );
 
   updateRecord.resetAdminAuthForTests();
   const savedSupabasePassword = process.env.SUPABASE_ADMIN_PASSWORD;
@@ -1004,6 +1081,211 @@ async function main() {
   const shortSecret = await login.handler(loginEvent(ADMIN_PASSWORD, '198.51.100.71'), {});
   check('login with a short session secret fails closed', shortSecret.statusCode === 500 && !hasSessionCookie(shortSecret));
   process.env.ADMIN_SESSION_SECRET = savedSecret;
+
+  // --- 5. Sitemap, record SEO, and error reporting -----------------------
+  const graveLd = jsonLd(grave.body);
+  check('the grave page publishes Person structured data', Boolean(graveLd) && graveLd['@type'] === 'Person');
+  same('structured data uses the page name order', graveLd && graveLd.name, 'Wilhelmina J Doe Abel, Jr');
+  same('structured data uses the recorded birth and death dates', graveLd && [graveLd.birthDate, graveLd.deathDate], ['1907-01-28', '2008-09-12']);
+  same('structured data names the cemetery as the burial place', graveLd && graveLd.burialPlace && graveLd.burialPlace.name, 'Capernaum Cemetery');
+  same('the grave canonical URL is that record', canonicalHref(grave.body), 'https://memorafind.com/grave/1000004');
+  check('the grave description names the person, the dates and the cemetery', metaContent(grave.body, 'name', 'description').indexOf('Wilhelmina J Doe Abel, Jr — born 01/28/1907, died 09/12/2008 — Capernaum Cemetery') === 0);
+  check('Open Graph and Twitter titles stay equal to the document title', titleText(grave.body) !== '' && metaContent(grave.body, 'property', 'og:title') === titleText(grave.body) && metaContent(grave.body, 'name', 'twitter:title') === titleText(grave.body));
+  check('Open Graph and Twitter descriptions stay equal to the meta description', metaContent(grave.body, 'property', 'og:description') === metaContent(grave.body, 'name', 'description') && metaContent(grave.body, 'name', 'twitter:description') === metaContent(grave.body, 'name', 'description'));
+  check('the grave page is indexable', grave.body.indexOf('noindex') === -1);
+
+  const emptyLd = jsonLd(emptyGrave.body);
+  check('a record with no dates omits birthDate and deathDate', Boolean(emptyLd) && !Object.prototype.hasOwnProperty.call(emptyLd, 'birthDate') && !Object.prototype.hasOwnProperty.call(emptyLd, 'deathDate'));
+  same('a record with no dates still names the person and the cemetery', emptyLd && [emptyLd.name, emptyLd.burialPlace && emptyLd.burialPlace.name], ['N Nobody', 'Honey Ford Cemetery']);
+  check('an unrecorded date is not written into structured data as zero', emptyGrave.body.indexOf('birthDate') === -1 && emptyGrave.body.indexOf('deathDate') === -1);
+  same('a missing record is noindex and has no canonical', [missing.body.indexOf('noindex') !== -1, canonicalHref(missing.body)], [true, '']);
+
+  check('a cemetery search has its own description and canonical URL', metaContent(search.body, 'name', 'description').indexOf('Bamberg County Memory Gardens') !== -1 && canonicalHref(search.body) === 'https://memorafind.com/search/bcmg');
+  check('an idle cemetery search canonicalises to that cemetery', canonicalHref(idle.body) === 'https://memorafind.com/search/capernaum' && metaContent(idle.body, 'name', 'description').indexOf('Capernaum Cemetery') !== -1);
+  check('the administrator login page is noindex', openGate.body.indexOf('noindex') !== -1 && canonicalHref(openGate.body) === '');
+  check('the administrator update page is noindex', signedGate.body.indexOf('name="robots" content="noindex, nofollow"') !== -1 && canonicalHref(signedGate.body) === 'https://memorafind.com/search/update');
+
+  const home = await renderIndex.handler({}, {});
+  const contact = await renderContact.handler({}, {});
+  check('the landing page has the site description and the home canonical', home.statusCode === 200 && canonicalHref(home.body) === 'https://memorafind.com/' && metaContent(home.body, 'name', 'description').indexOf('free grave-finder') !== -1 && home.body.indexOf('noindex') === -1);
+  check('the contact page has its own description and canonical', contact.statusCode === 200 && canonicalHref(contact.body) === 'https://memorafind.com/contact' && metaContent(contact.body, 'name', 'description').indexOf('Contact MemoraFind') !== -1 && contact.body.indexOf('noindex') === -1);
+
+  reset();
+  const unknownCemetery = await renderSearch.handler({ path: '/search/not-a-cemetery' }, {});
+  check('an unknown cemetery is noindex and does not canonicalise home', unknownCemetery.statusCode === 404 && unknownCemetery.body.indexOf('noindex') !== -1 && canonicalHref(unknownCemetery.body) === '');
+
+  reset({
+    rows: [{
+      memorial_id: 1000111,
+      first_name: 'Ann',
+      maiden_name: "O'Brien",
+      last_name: 'A&B <test>',
+      birth_month: 'Sep',
+      birth_day: 2,
+      birth_year: 1930,
+      death_year: 2001
+    }],
+    view: 'bcmg_data_formatted_2'
+  });
+  const oddGrave = await renderGrave.handler({ path: '/grave/1000111' }, {});
+  const oddLd = jsonLd(oddGrave.body);
+  check('a name with markup cannot close the structured-data script', oddGrave.statusCode === 200 && oddGrave.body.indexOf('<test>') === -1 && oddGrave.body.indexOf('</script><script') === -1);
+  same('structured data keeps that name and omits an unrecorded death day', oddLd && [oddLd.name, oddLd.birthDate, oddLd.deathDate, oddLd.burialPlace && oddLd.burialPlace.name], ["Ann O'Brien A&B <test>", '1930-09-02', '2001', 'Bamberg County Memory Gardens']);
+
+  same('sitemap text escapes the five XML characters', sitemap.escapeXml('A&B<C>\'"'), 'A&amp;B&lt;C&gt;&apos;&quot;');
+  reset({
+    rows: [
+      { memorial_id: 1000002 },
+      { memorial_id: '1000001' },
+      { memorial_id: 'nope' },
+      { memorial_id: null }
+    ]
+  });
+  const siteMap = await sitemap.handler({ httpMethod: 'GET', path: '/sitemap.xml' }, {});
+  const locs = sitemapLocs(siteMap.body);
+  check('the sitemap is XML with a cache header', siteMap.statusCode === 200 && siteMap.headers['Content-Type'].indexOf('application/xml') === 0 && siteMap.headers['Cache-Control'].indexOf('max-age=3600') !== -1 && siteMap.headers['Netlify-CDN-Cache-Control'].indexOf('s-maxage=86400') !== -1);
+  same('the sitemap lists the public pages and each grave once, sorted', locs, [
+    'https://memorafind.com/',
+    'https://memorafind.com/contact',
+    'https://memorafind.com/search/bcmg',
+    'https://memorafind.com/search/capernaum',
+    'https://memorafind.com/search/honeyford',
+    'https://memorafind.com/grave/1000001',
+    'https://memorafind.com/grave/1000002'
+  ]);
+  check('the sitemap does not list admin routes', siteMap.body.indexOf('update') === -1 && siteMap.body.indexOf('nope') === -1);
+  const siteMapCalls = dataCalls();
+  same('the sitemap reads memorial_id from each base table', siteMapCalls.map(function (call) { return call.table; }), ['bcmg_data', 'capernaum_data', 'honeyford_data']);
+  check('the sitemap selects only memorial_id and pages the read', siteMapCalls.every(function (call) {
+    return call.select === 'memorial_id' && call.range && call.range[0] === 0 && call.range[1] === 999 && call.order && call.order.column === 'memorial_id';
+  }));
+
+  reset({ error: { message: 'db down ' + process.env.SUPABASE_API_KEY } });
+  const siteMapDown = await captureLogs(function () {
+    return sitemap.handler({ httpMethod: 'GET', path: '/sitemap.xml?x=1' }, {});
+  });
+  check('a sitemap failure is a short 503 with no secret and no cache', siteMapDown.result.statusCode === 503 && siteMapDown.result.headers['Cache-Control'] === 'no-store' && siteMapDown.result.body.indexOf(process.env.SUPABASE_API_KEY) === -1 && siteMapDown.result.body.indexOf('<loc>') === -1);
+  check('a sitemap failure logs the scrubbed database error', siteMapDown.lines.join('\n').indexOf('Could not build the sitemap') !== -1 && siteMapDown.lines.join('\n').indexOf(process.env.SUPABASE_API_KEY) === -1 && siteMapDown.lines.join('\n').indexOf('db down') !== -1);
+
+  const robots = fs.readFileSync(path.resolve(__dirname, '../public/robots.txt'), 'utf8');
+  const netlifyConfig = fs.readFileSync(path.resolve(__dirname, '../netlify.toml'), 'utf8');
+  check('robots.txt points at the sitemap and disallows the admin routes', robots.indexOf('Sitemap: https://memorafind.com/sitemap.xml') !== -1 && robots.indexOf('Disallow: /.netlify/functions/updatePage') !== -1 && robots.indexOf('Disallow: /.netlify/functions/login') !== -1 && robots.indexOf('Disallow: /.netlify/functions/logout') !== -1 && robots.indexOf('Disallow: /.netlify/functions/updateRecord') !== -1 && robots.indexOf('Disallow: /.netlify/functions/getUpdateRecord') !== -1 && robots.indexOf('Disallow: /.netlify/functions/logClientError') !== -1 && robots.indexOf('Disallow: /search/update') !== -1);
+  check('netlify.toml serves /sitemap.xml from the function', netlifyConfig.indexOf('from = "/sitemap.xml"') !== -1 && netlifyConfig.indexOf('to = "/.netlify/functions/sitemap"') !== -1);
+  check('the committed static sitemap is gone', !fs.existsSync(path.resolve(__dirname, '../public/sitemap.xml')));
+
+  logClientError.resetClientErrorLogForTests();
+  errorReport.resetErrorReportingForTests();
+  const clientOk = await captureLogs(function () {
+    return logClientError.handler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.10' },
+      body: JSON.stringify({
+        kind: 'error',
+        message: 'boom',
+        stack: 'Error: boom\n    at page',
+        path: '/grave/1000004?lastName=secret',
+        password: ADMIN_PASSWORD,
+        source: 'https://memorafind.com/grave/1000004'
+      })
+    });
+  });
+  let clientEntry = null;
+  try {
+    clientEntry = JSON.parse(clientOk.lines[0] || '');
+  } catch (error) {
+    clientEntry = null;
+  }
+  check('a browser error is accepted and logged without the query or the extra field', clientOk.result.statusCode === 204 && Boolean(clientEntry) && clientEntry.function === 'logClientError' && clientEntry.path === '/grave/1000004' && clientEntry.message === 'error: boom' && clientEntry.stack.indexOf('at page') !== -1 && typeof clientEntry.timestamp === 'string' && clientOk.lines.join('\n').indexOf(ADMIN_PASSWORD) === -1);
+
+  const clientPromise = await captureLogs(function () {
+    return logClientError.handler({
+      httpMethod: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.11' },
+      body: JSON.stringify({ kind: 'unhandledrejection', message: 'rejected', path: 'https://memorafind.com/search/bcmg?lastName=Wil' })
+    });
+  });
+  check('an unhandled rejection is logged against the pathname', clientPromise.result.statusCode === 204 && clientPromise.lines.join('\n').indexOf('unhandledrejection: rejected') !== -1 && clientPromise.lines.join('\n').indexOf('/search/bcmg') !== -1 && clientPromise.lines.join('\n').indexOf('lastName') === -1);
+
+  const leaked = 'password=' + ADMIN_PASSWORD + ' key=' + process.env.SUPABASE_API_KEY;
+  const clientSecret = await captureLogs(function () {
+    return logClientError.handler({
+      httpMethod: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.12' },
+      body: JSON.stringify({ kind: 'error', message: leaked, stack: 'stack ' + process.env.SUPABASE_API_KEY })
+    });
+  });
+  check('a browser report does not keep a password or the API key', clientSecret.result.statusCode === 204 && clientSecret.lines.join('\n').indexOf(ADMIN_PASSWORD) === -1 && clientSecret.lines.join('\n').indexOf(process.env.SUPABASE_API_KEY) === -1 && clientSecret.lines.join('\n').indexOf('[redacted]') !== -1);
+
+  const tooBig = await captureLogs(function () {
+    return logClientError.handler({
+      httpMethod: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.13' },
+      body: JSON.stringify({ kind: 'error', message: 'UNIQUE-BODY-MARKER-XYZ'.repeat(300) })
+    });
+  });
+  check('an oversized browser report is rejected and not logged', tooBig.result.statusCode === 413 && tooBig.lines.join('\n').indexOf('UNIQUE-BODY-MARKER-XYZ') === -1);
+
+  check('a browser report that is not JSON is rejected', (await logClientError.handler({ httpMethod: 'POST', headers: { 'x-forwarded-for': '203.0.113.14' }, body: '{' })).statusCode === 400);
+  check('a browser report must be a POST', (await logClientError.handler({ httpMethod: 'GET', headers: { 'x-forwarded-for': '203.0.113.15' } })).statusCode === 405);
+
+  logClientError.resetClientErrorLogForTests();
+  let limited = null;
+  for (let n = 0; n < logClientError.MAX_PER_WINDOW; n += 1) {
+    limited = await logClientError.handler({
+      httpMethod: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.16' },
+      body: JSON.stringify({ kind: 'error', message: 'n' + n })
+    });
+    check('browser report ' + (n + 1) + ' under the limit is accepted', limited.statusCode === 204);
+  }
+  const overLimit = await logClientError.handler({
+    httpMethod: 'POST',
+    headers: { 'x-forwarded-for': '203.0.113.16' },
+    body: JSON.stringify({ kind: 'error', message: 'too many' })
+  });
+  const otherAddress = await logClientError.handler({
+    httpMethod: 'POST',
+    headers: { 'x-forwarded-for': '203.0.113.17' },
+    body: JSON.stringify({ kind: 'error', message: 'other address' })
+  });
+  check('the browser report endpoint rate limits one address', overLimit.statusCode === 429);
+  check('a different address is not rate limited', otherAddress.statusCode === 204);
+
+  const sentryCalls = [];
+  errorReport.setSentryTransportForTests(function (target) {
+    sentryCalls.push(target);
+    return Promise.resolve();
+  });
+  const withoutDsn = await errorReport.logError({ functionName: 'renderIndex', message: 'no sentry' });
+  check('Sentry is a no-op when SENTRY_DSN is unset', sentryCalls.length === 0 && withoutDsn.function === 'renderIndex' && withoutDsn.message === 'no sentry');
+  process.env.SENTRY_DSN = 'https://super-secret-dsn-value@example.com/not-a-project';
+  const badDsn = await captureLogs(function () {
+    return errorReport.logError({ functionName: 'renderIndex', message: 'bad dsn' });
+  });
+  check('an unusable SENTRY_DSN does not send and is not logged', sentryCalls.length === 0 && badDsn.lines.join('\n').indexOf('super-secret-dsn-value') === -1 && badDsn.lines.join('\n').indexOf('not a usable https DSN') !== -1);
+  process.env.SENTRY_DSN = 'https://publickey@o123.ingest.sentry.io/456';
+  await errorReport.logError({
+    functionName: 'renderGrave',
+    path: '/grave/1000004',
+    message: 'render failed password=' + ADMIN_PASSWORD,
+    stack: 'stack ' + process.env.SUPABASE_API_KEY
+  });
+  const sentryBody = sentryCalls[0] && sentryCalls[0].body;
+  const sentryHeader = sentryCalls[0] && sentryCalls[0].headers && sentryCalls[0].headers['X-Sentry-Auth'];
+  check('Sentry receives the scrubbed report when SENTRY_DSN is set', sentryCalls.length === 1 && sentryCalls[0].path === '/api/456/envelope/' && String(sentryHeader).indexOf('sentry_key=publickey') !== -1 && String(sentryBody).indexOf(ADMIN_PASSWORD) === -1 && String(sentryBody).indexOf(process.env.SUPABASE_API_KEY) === -1 && String(sentryBody).indexOf('render failed') !== -1 && String(sentryBody).indexOf('/grave/1000004') !== -1);
+  delete process.env.SENTRY_DSN;
+  errorReport.resetErrorReportingForTests();
+
+  const friendly = await captureLogs(function () {
+    return errorReport.friendlyError({
+      functionName: 'renderIndex',
+      path: '/secret?password=' + ADMIN_PASSWORD,
+      error: new Error('exploded ' + ADMIN_PASSWORD),
+      message: 'Error rendering index.ejs'
+    });
+  });
+  check('a friendly error page hides the exception and asks not to be indexed', friendly.result.statusCode === 500 && friendly.result.body.indexOf('Something went wrong') !== -1 && friendly.result.body.indexOf('noindex') !== -1 && friendly.result.body.indexOf(ADMIN_PASSWORD) === -1 && friendly.result.body.indexOf('exploded') === -1 && friendly.result.headers['Cache-Control'] === 'no-store');
+  check('a friendly error log keeps the message and drops the secret', friendly.lines.join('\n').indexOf('Error rendering index.ejs') !== -1 && friendly.lines.join('\n').indexOf(ADMIN_PASSWORD) === -1 && friendly.lines.join('\n').indexOf('[redacted]') !== -1);
 
   console.log(passed + ' checks passed');
   if (failures.length > 0) {
