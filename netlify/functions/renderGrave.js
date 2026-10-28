@@ -8,6 +8,7 @@ const { findCemetery } = require('./findCemetery');
 //same two things — a card and the person's own page must not be able to disagree
 //about a date.
 const { baseTableFor, displayRecord } = require('./baseRecord');
+const { logError, friendlyError } = require('./errorReport');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -75,7 +76,7 @@ function requestedMemorialId(event) {
 }
 
 //Render one of the page's states, always as HTML, always escaping the values.
-async function renderTemplate(templateName, templateData, statusCode, plainTextFallback) {
+async function renderTemplate(templateName, templateData, statusCode) {
   try {
     const templatePath = path.resolve(__dirname, '../../public/views/' + templateName);
     const html = await ejs.renderFile(templatePath, templateData);
@@ -87,25 +88,25 @@ async function renderTemplate(templateName, templateData, statusCode, plainTextF
     };
   } catch (error) {
     //A template that cannot be rendered is still not a stack trace.
-    console.error('Error rendering ' + templateName + ':', error);
-    return {
-      statusCode,
-      headers: { 'Content-Type': 'text/plain' },
-      body: plainTextFallback
-    };
+    return friendlyError({
+      functionName: 'renderGrave',
+      error: error,
+      statusCode: statusCode,
+      message: 'Error rendering ' + templateName
+    });
   }
 }
 
 function renderGravePage(locals) {
-  return renderTemplate('grave.ejs', locals, 200, 'Record could not be displayed');
+  return renderTemplate('grave.ejs', locals, 200);
 }
 
 function renderGraveNotFoundPage(requestedId, malformed) {
-  return renderTemplate('grave-not-found.ejs', { requestedId, malformed }, 404, 'Record not found');
+  return renderTemplate('grave-not-found.ejs', { requestedId, malformed }, 404);
 }
 
 function renderGraveUnavailablePage(requestedId) {
-  return renderTemplate('grave-unavailable.ejs', { requestedId }, 503, 'The record database is temporarily unavailable.');
+  return renderTemplate('grave-unavailable.ejs', { requestedId }, 503);
 }
 
 //export function
@@ -126,7 +127,12 @@ exports.handler = async function (event, context) {
   try {
     cemeteryView = await findCemetery(requestedId);
   } catch (error) {
-    console.error('Database error while finding the cemetery for memorial ID', requestedId, ':', error);
+    await logError({
+      functionName: 'renderGrave',
+      event: event,
+      error: error,
+      message: 'Database error while finding the cemetery for memorial ID ' + requestedId
+    });
     return renderGraveUnavailablePage(requestedId);
   }
 
@@ -151,12 +157,11 @@ exports.handler = async function (event, context) {
     if (error) throw error;
     record = (Array.isArray(data) && data.length > 0) ? data[0] : null;
   } catch (error) {
-    console.error('Database query error for memorial ID', requestedId, ':', error);
-    console.error('Supabase error details:', {
-      code: error && error.code,
-      message: error && error.message,
-      details: error && error.details,
-      hint: error && error.hint
+    await logError({
+      functionName: 'renderGrave',
+      event: event,
+      error: error,
+      message: 'Database query error for memorial ID ' + requestedId
     });
     return renderGraveUnavailablePage(requestedId);
   }

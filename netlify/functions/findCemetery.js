@@ -1,4 +1,5 @@
 const { createClient } = require("@supabase/supabase-js");
+const { logError } = require("./errorReport");
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
 
 async function findCemetery(memorial_id) {
@@ -24,7 +25,11 @@ async function findCemetery(memorial_id) {
     }
 
     if (error) {
-      console.error(`Error fetching from ${cemeteryView}:`, error);
+      await logError({
+        functionName: "findCemetery",
+        error: error,
+        message: "Error fetching from " + cemeteryView
+      });
       throw new Error('An error occurred while querying the database.');
     }
   }

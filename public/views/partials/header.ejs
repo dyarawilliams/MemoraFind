@@ -9,20 +9,20 @@
       var _pageTitle = (typeof pageTitle !== "undefined" && pageTitle)
           ? pageTitle
           : "MemoraFind — Bamberg County cemetery records";
-      /* pageDescription is optional. Only the single-record page passes one, so
-         that a pasted link describes that person; every other page keeps the
-         site's own description. */
+      /* pageDescription is optional. A page passes its own when a shared link
+         should describe that page (a person's record, one cemetery's search,
+         Contact Us). A page that passes none keeps the site's own description. */
       var _pageDescription = (typeof pageDescription !== "undefined" && pageDescription)
           ? pageDescription
           : "MemoraFind is a free grave-finder for Bamberg County, South Carolina: search burial records from Bamberg County Memory Gardens, Capernaum Cemetery and Honey Ford Cemetery by name, maiden name, birth or death year.";
 
       /* ---- noindex -------------------------------------------------------
          A page that is not a destination of its own can ask not to be indexed.
-         Two pass it: the administrator update page (/search/update, an admin
-         lookup that has no business competing with the home page in a search
-         result) and the static 404 page (public/404.html, which has no address
-         of its own and is never the page someone meant to find). Every other
-         page leaves it out, so no crawlable page changes. */
+         The administrator pages pass it (the update form and the login page),
+         as do the "not found" pages and the friendly error page. The record
+         page that could not be read does not: that response is the grave's own
+         address during an outage, and noindex there would ask a crawler to
+         drop the person. Every public page leaves it out. */
       var _noindex = (typeof noindex !== "undefined" && noindex === true);
       /* ---- Link previews (Open Graph / Twitter) --------------------------
          Shareable pages need absolute addresses, so every URL below is built
@@ -75,6 +75,13 @@
     <meta name="twitter:title" content="<%= _pageTitle %>" />
     <meta name="twitter:description" content="<%= _pageDescription %>" />
     <meta name="twitter:image" content="<%= _shareImage %>" />
+    <%
+      /* Open Graph and Twitter titles stay equal to the document title above.
+         jsonLd is optional. The record page passes a Person description; the
+         string is already JSON with "<" escaped, so it is printed raw. */
+      var _jsonLd = (typeof jsonLd === "string" && jsonLd) ? jsonLd : "";
+    %>
+    <% if (_jsonLd) { %><script type="application/ld+json"><%- _jsonLd %></script><% } %>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235c0f12'/%3E%3Cpath d='M7 26V15a9 9 0 0 1 18 0v11' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12 19h8M12 23h5' fill='none' stroke='%23e0a906' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/css/tokens.css" />
     <link rel="stylesheet" href="/css/styles.css" />

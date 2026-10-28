@@ -1,29 +1,20 @@
 #!/usr/bin/env node
 /*
- * Build public/sitemap.xml from the record IDs in the scraper's CSV files.
+ * Check the memorial IDs in the scraper's CSV files.
  *
- * Why this exists: a cemetery search page no longer lists records until a
- * visitor types a query (owner's instruction, 2026-10-23), so the only route a
- * search engine has to a person's grave page is this sitemap. A hand-written
- * file with 2,428 lines in it would be wrong the first time a record is added
- * or removed, and nobody would notice; generating it from the same CSV files
- * the database was loaded from means the sitemap cannot disagree with the
- * records we hold.
+ * The live sitemap is no longer a file in public/. Netlify serves
+ * /sitemap.xml from netlify/functions/sitemap.js, which reads memorial_id
+ * from Supabase on each request (see the redirect in netlify.toml). A
+ * committed public/sitemap.xml would be wrong the first time a record changed
+ * in the database, and force = true on that redirect is what keeps a leftover
+ * file from being what crawlers receive.
  *
- * The sitemap lists, in this order:
- *   1. https://memorafind.com/                    (the landing page)
- *   2. https://memorafind.com/search/bcmg         (the three cemetery searches)
- *   3. https://memorafind.com/search/capernaum
- *   4. https://memorafind.com/search/honeyford
- *   5. https://memorafind.com/grave/<id>          (every record, sorted numerically)
+ * This tool still refuses a truncated CSV. The IDs the database was loaded
+ * from are 1000001–1002428, 2,428 of them, one count per cemetery file. Run
+ * it after the CSVs change. It does not write public/sitemap.xml:
  *
- * This is a development tool, not part of deployment: nothing runs it on
- * Netlify, it adds no dependency (only Node's own fs and path), and it is not
- * referenced by netlify.toml. Run it after the CSVs change and commit the
- * regenerated file:
- *
- *   node tools/build-sitemap.js           # write public/sitemap.xml
- *   node tools/build-sitemap.js --check   # exit 1 if public/sitemap.xml is stale
+ *   node tools/build-sitemap.js
+ *   node tools/build-sitemap.js --check
  */
 'use strict';
 
@@ -32,13 +23,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const SCRAPER_DIR = path.join(ROOT, 'python-scraper');
-const OUTPUT = path.join(ROOT, 'public', 'sitemap.xml');
 
-const BASE_URL = 'https://memorafind.com';
-const LASTMOD = '2026-10-23';
-
-// The records we hold, one CSV per cemetery. Order here is the order the
-// search URLs appear in the sitemap.
+// The records the database was loaded from, one CSV per cemetery.
 const SOURCES = [
     { cemetery: 'bcmg', file: 'parsed_names_bcmg.csv', expected: 1815 },
     { cemetery: 'capernaum', file: 'parsed_names_capernaum.csv', expected: 346 },
@@ -111,9 +97,9 @@ function readMemorialIds(fileName) {
 
 /*
  * Collect and check the IDs. This is deliberately strict: a truncated or
- * half-written CSV would otherwise produce a shorter sitemap that still looks
- * well-formed, and pages would quietly drop out of the index. Failing here
- * means a person decides, not a silent shrink.
+ * half-written CSV would otherwise look complete. Failing here means a person
+ * decides, not a silent shrink. The live sitemap is built from Supabase, not
+ * from these files.
  */
 function collectIds() {
     const ids = [];
@@ -169,72 +155,23 @@ function collectIds() {
     return { ids: sorted, perSource };
 }
 
-/* Escape the five characters that cannot appear literally in XML text. */
-function escapeXml(value) {
-    return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-}
-
-function urlBlock(loc) {
-    return '  <url>\n    <loc>' + escapeXml(loc) + '</loc>\n    <lastmod>' + LASTMOD + '</lastmod>\n  </url>\n';
-}
-
-function buildSitemap(ids) {
-    const urls = [BASE_URL + '/'];
-    for (const source of SOURCES) {
-        urls.push(BASE_URL + '/search/' + source.cemetery);
-    }
-    for (const id of ids) {
-        urls.push(BASE_URL + '/grave/' + id);
-    }
-
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
-    for (const loc of urls) {
-        xml += urlBlock(loc);
-    }
-    xml += '</urlset>\n';
-
-    return { xml, urlCount: urls.length };
-}
-
 function main() {
-    const checkOnly = process.argv.includes('--check');
-    const { ids } = collectIds();
-    const { xml, urlCount } = buildSitemap(ids);
-
-    if (checkOnly) {
-        const current = fs.existsSync(OUTPUT) ? fs.readFileSync(OUTPUT, 'utf8') : null;
-        if (current === xml) {
-            console.log('public/sitemap.xml is up to date (' + urlCount + ' URLs, ' + Buffer.byteLength(xml) + ' bytes)');
-            return;
-        }
-        if (current === null) {
-            console.error('public/sitemap.xml is MISSING — run: node tools/build-sitemap.js');
-        } else {
-            const currentUrls = (current.match(/<url>/g) || []).length;
-            const reason = currentUrls === urlCount
-                ? 'it holds ' + currentUrls + ' URLs, the same number the records need, but the contents differ'
-                : 'it holds ' + currentUrls + ' URLs, the records need ' + urlCount;
-            console.error('public/sitemap.xml is STALE — ' + reason + '. Run: node tools/build-sitemap.js');
-        }
+    const { ids, perSource } = collectIds();
+    const staleFile = path.join(ROOT, 'public', 'sitemap.xml');
+    if (fs.existsSync(staleFile)) {
+        console.error('public/sitemap.xml is present. The live sitemap is the Netlify function, and this file would be unused. Delete it.');
         process.exit(1);
     }
-
-    fs.writeFileSync(OUTPUT, xml, 'utf8');
     console.log(
-        'Wrote public/sitemap.xml (' + urlCount + ' URLs: 1 home, ' + SOURCES.length + ' cemetery searches, ' +
-        ids.length + ' grave pages; ' + Buffer.byteLength(xml) + ' bytes)'
+        'Scraper CSVs hold ' + ids.length + ' memorial IDs (' +
+        perSource.map(function (source) { return source.file + ': ' + source.count; }).join(', ') +
+        '). /sitemap.xml is generated by netlify/functions/sitemap.js. This tool does not write a file.'
     );
 }
 
 try {
     main();
 } catch (error) {
-    console.error('Could not build public/sitemap.xml:', error.message);
+    console.error('Could not check the scraper record IDs:', error.message);
     process.exit(1);
 }

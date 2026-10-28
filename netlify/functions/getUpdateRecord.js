@@ -4,6 +4,7 @@ const path = require('path');
 const { findCemetery } = require('./findCemetery');
 const { baseTableFor } = require('./baseRecord');
 const { requireAdmin } = require('./adminSession');
+const { logError } = require('./errorReport');
 
 //initialize connection to Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_API_KEY);
@@ -73,7 +74,12 @@ exports.handler = async function (event, context) {
   try {
     cemetery = await findCemetery(memorial_id);
   } catch (error) {
-    console.error('Database error while finding the cemetery for memorial ID', memorial_id, ':', error);
+    await logError({
+      functionName: 'getUpdateRecord',
+      event: event,
+      error: error,
+      message: 'Database error while finding the cemetery for memorial ID ' + memorial_id
+    });
     return await renderUpdatePage({ record: null, message: DATABASE_UNAVAILABLE_MESSAGE });
   }
 
@@ -143,13 +149,12 @@ exports.handler = async function (event, context) {
 
   } catch (error) {
     // The record could not be read (or the query itself failed). Say so plainly
-    // and keep the real error, with its code, in the function log.
-    console.error('Database query error:', error);
-    console.error('Supabase error details:', {
-      code: error && error.code,
-      message: error && error.message,
-      details: error && error.details,
-      hint: error && error.hint
+    // and keep the real error in the function log, never in the page.
+    await logError({
+      functionName: 'getUpdateRecord',
+      event: event,
+      error: error,
+      message: 'Database query error'
     });
     return await renderUpdatePage({ record: null, message: DATABASE_UNAVAILABLE_MESSAGE });
   }

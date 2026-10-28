@@ -1,6 +1,7 @@
 const ejs = require('ejs');
 const path = require('path');
 const { requireAdmin } = require('./adminSession');
+const { friendlyError } = require('./errorReport');
 
 exports.handler = async function (event) {
   try {
@@ -18,11 +19,11 @@ exports.handler = async function (event) {
       body: html
     };
   } catch (error) {
-    console.error('Error rendering template:', error.message);
-    return {
-      statusCode: 500,
-      headers: { 'Cache-Control': 'no-store' },
-      body: 'Internal Server Error'
-    };
+    return friendlyError({
+      functionName: 'updatePage',
+      event: event,
+      error: error,
+      message: 'Error rendering template'
+    });
   }
 };

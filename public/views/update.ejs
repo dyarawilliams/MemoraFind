@@ -14,7 +14,12 @@
      destination for a family member. Both are head tags only; nothing about
      the form, its fields or the save changes. */
 %>
-<%- include('partials/header.ejs', { pageTitle: 'Update a grave record — MemoraFind', canonicalPath: '/search/update', noindex: true }) %>
+<%- include('partials/header.ejs', {
+      pageTitle: 'Update a grave record — MemoraFind',
+      pageDescription: 'Administrator page for correcting a Bamberg County burial record. This page is not a public search.',
+      canonicalPath: '/search/update',
+      noindex: true
+    }) %>
 
         <div class="page">
             <div class="container">

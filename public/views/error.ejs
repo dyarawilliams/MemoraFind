@@ -1,0 +1,43 @@
+<%- include('partials/header.ejs', {
+      pageTitle: 'Something went wrong — MemoraFind',
+      pageDescription: 'MemoraFind could not finish loading this page. Please try again shortly.',
+      canonicalPath: false,
+      noindex: true
+    }) %>
+
+        <div class="page page--narrow">
+            <div class="container">
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Home</a></li>
+                        <li aria-current="page">Something went wrong</li>
+                    </ol>
+                </nav>
+
+                <div class="section-head">
+                    <h1>Something went wrong</h1>
+                    <p>
+                        This page could not be loaded just now. Please try again shortly.
+                        That says nothing about whether a record exists.
+                    </p>
+                </div>
+
+                <div class="empty-state" role="status">
+                    <svg class="empty-state__icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                        <path d="M5 29V15a11 11 0 0 1 22 0v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <path d="M11 19.5h10M11 24h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <h3>Please try again</h3>
+                    <p>
+                        The problem was on our side. Searching by name is a way round it
+                        if this lasts.
+                    </p>
+                    <div class="empty-state__actions">
+                        <a class="btn btn--primary" href="/">Back to the home page</a>
+                        <a class="btn btn--ghost" href="/#search">Search the records</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<%- include('partials/footer.ejs') %>
