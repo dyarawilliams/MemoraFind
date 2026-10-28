@@ -1,0 +1,65 @@
+name: Bug report
+description: Something on MemoraFind is broken or showing the wrong result.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Do not include passwords, API keys, or other secrets.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong, in a sentence or two.
+      placeholder: A last-name search shows no one who is listed on that cemetery's page.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order.
+      placeholder: |
+        1. Open https://memorafind.com/
+        2. Choose a cemetery and search
+        3. Open the grave page
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead.
+    validations:
+      required: true
+  - type: input
+    id: page-url
+    attributes:
+      label: Page URL
+      description: The address where you saw the problem.
+      placeholder: https://memorafind.com/grave/12345
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and device
+      description: Browser, version, and device, if you know them.
+      placeholder: Chrome on Android
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Paste or drag images here if they help show the problem.
+    validations:
+      required: false

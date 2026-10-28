@@ -1,0 +1,56 @@
+name: Record correction
+description: Report a burial record that is wrong or missing.
+title: "Record: "
+labels: ["data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for a wrong or missing burial record at one of the three cemeteries. A date, section, or lot that was never recorded should stay unrecorded — do not send a guessed zero or a made-up place. Do not include secrets.
+  - type: dropdown
+    id: cemetery
+    attributes:
+      label: Cemetery
+      description: Which cemetery this record belongs to.
+      options:
+        - Bamberg County Memory Gardens
+        - Capernaum Cemetery
+        - Honey Ford Cemetery
+    validations:
+      required: true
+  - type: input
+    id: record
+    attributes:
+      label: Record link or ID
+      description: The grave page (https://memorafind.com/grave/<id>) or the numeric record ID. Leave this blank if the person is missing entirely.
+      placeholder: https://memorafind.com/grave/12345
+    validations:
+      required: false
+  - type: input
+    id: name
+    attributes:
+      label: Name on the record
+      description: The name as shown, or the name of the person who is missing.
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong
+      description: The incorrect or missing detail (name, dates, section, lot, cemetery, or a person who is not listed).
+    validations:
+      required: true
+  - type: textarea
+    id: correct
+    attributes:
+      label: Correct information
+      description: What the record should say. Leave a part out if it was never recorded.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Source or evidence
+      description: Where the correction comes from, such as a headstone, an obituary, a cemetery list, or a family source.
+    validations:
+      required: true

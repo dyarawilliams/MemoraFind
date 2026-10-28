@@ -1,0 +1,7 @@
+# Bugs, features, and record corrections each have a form. Other questions
+# go to the Contact page, so a blank issue is not offered.
+blank_issues_enabled: false
+contact_links:
+  - name: MemoraFind Contact page
+    url: https://memorafind.com/contact
+    about: Questions about a burial record or the site that are not a bug, a feature, or a record correction.
