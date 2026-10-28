@@ -1185,9 +1185,27 @@ a.badge--id-link:focus-visible {
     font-size: var(--fs-2xl);
 }
 
-/* Breathing room between the record and the correction note below it. */
+/* Breathing room between the record and the correction note below it.
+   The report link is an ordinary text link: burgundy words, gold underline,
+   the same contrast rule as every other link on the cream page. min-height
+   uses the site's tap size so a thumb can hit it on a phone. The issue URL
+   stays in the href, so a long encoded name cannot widen the page. */
 .grave-note {
     margin-top: var(--sp-5);
+}
+
+.grave-note__body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.grave-note__report {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    font-weight: 650;
+    overflow-wrap: anywhere;
 }
 
 /* --------------------------------------------------------------------------
