@@ -21,9 +21,17 @@ body:
   - type: input
     id: record
     attributes:
-      label: Record link or ID
-      description: The grave page (https://memorafind.com/grave/<id>) or the numeric record ID. Leave this blank if the person is missing entirely.
+      label: Record link
+      description: The grave page (https://memorafind.com/grave/<id>). Leave this blank if the person is missing entirely.
       placeholder: https://memorafind.com/grave/12345
+    validations:
+      required: false
+  - type: input
+    id: record_id
+    attributes:
+      label: Record ID
+      description: The numeric record ID shown on the grave page. Leave this blank if the person is missing entirely.
+      placeholder: "1001728"
     validations:
       required: false
   - type: input

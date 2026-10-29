@@ -22,7 +22,14 @@
      or "Robert Smith, Jr." when a suffix was recorded. A comma is written only
      before a suffix. The prefix and the Veteran flag are badges. The Age row
      is shown only when the record has a usable age, and the Veteran badge only
-     when the record is flagged as one, both exactly as the card does. */
+     when the record is flagged as one, both exactly as the card does.
+
+     The correction link at the foot of this page — and only this page — opens
+     the GitHub issue form record_correction.yml. The title, cemetery, canonical
+     grave URL, record ID and the same heading name are query parameters. Each
+     value goes through encodeURIComponent, and the href is printed escaped.
+     A missing record, an unreadable record and the administrator pages do not
+     include it. */
   var display = {};
   include('partials/record-display.ejs', { display: display });
 
@@ -110,6 +117,33 @@
       .replace(/&/g, "\\u0026")
       .replace(/\u2028/g, "\\u2028")
       .replace(/\u2029/g, "\\u2029");
+
+  /* These are the option labels on the cemetery dropdown in
+     .github/ISSUE_TEMPLATE/record_correction.yml. A value that is not one of
+     them is left off the link: GitHub only prefills a dropdown when the query
+     value matches an option exactly. */
+  var correctionCemeteries = [
+      "Bamberg County Memory Gardens",
+      "Capernaum Cemetery",
+      "Honey Ford Cemetery"
+  ];
+  var correctionTitle = "Correction: " + (nameText || "record");
+  if (memorialId) correctionTitle += " (" + memorialId + ")";
+  var correctionFields = [
+      ["template", "record_correction.yml"],
+      ["title", correctionTitle]
+  ];
+  if (correctionCemeteries.indexOf(cemeteryName) !== -1) {
+      correctionFields.push(["cemetery", cemeteryName]);
+  }
+  if (/^\d+$/.test(memorialId)) {
+      correctionFields.push(["record", "https://memorafind.com/grave/" + memorialId]);
+      correctionFields.push(["record_id", memorialId]);
+  }
+  if (nameText) correctionFields.push(["name", nameText]);
+  var correctionUrl = "https://github.com/dyarawilliams/MemoraFind/issues/new?" + correctionFields.map(function (field) {
+      return encodeURIComponent(field[0]) + "=" + encodeURIComponent(field[1]);
+  }).join("&");
 %>
 <%- include('partials/header.ejs', {
       pageTitle: pageTitle,
@@ -225,11 +259,16 @@
                     <svg class="notice__icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                         <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
                     </svg>
-                    <p>
-                        <strong>Need this record corrected?</strong> Note the record ID
-                        <strong><%= memorialId %></strong>, then contact a library administrator.
-                        This page only shows the record MemoraFind holds.
-                    </p>
+                    <div class="grave-note__body">
+                        <p>
+                            <a class="grave-note__report" href="<%= correctionUrl %>" target="_blank" rel="noopener noreferrer" aria-describedby="grave-correction-note">Report a correction<span class="visually-hidden"> (opens in a new tab)</span></a>
+                        </p>
+                        <p id="grave-correction-note">
+                            Reporting a correction opens a GitHub issue and needs a free GitHub account.
+                            You can also send a correction from the <a class="grave-note__contact" href="/contact">Contact page</a>.
+                            This page only shows the record MemoraFind holds.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

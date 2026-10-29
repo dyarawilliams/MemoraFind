@@ -14,8 +14,9 @@
  * logout, a rejected anonymous save, the field allowlist, and a missing
  * cemetery. The save's Supabase Auth sign-in is stubbed as well: a successful
  * sign-in attaches an access token to the update, and a failed sign-in is an
- * error. The sitemap, the record page's description and structured data, and
- * the error log are checked here too. Sentry's HTTP send is replaced for the
+ * error. The sitemap, the record page's description and structured data, the
+ * grave page's correction link, and the error log are checked here too.
+ * Sentry's HTTP send is replaced for the
  * duration of that check. No request leaves this process. The address is
  * TEST_ADMIN_EMAIL, not a real Supabase user. This script sets the admin
  * environment variables itself.
@@ -380,6 +381,45 @@ function jsonLd(html) {
   const match = String(html || '').match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
   if (!match) return null;
   return JSON.parse(match[1]);
+}
+
+function htmlUnescape(text) {
+  return String(text)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+// The href as it was printed (entities still escaped) and as a URL the browser
+// would open. encodeURIComponent leaves "'" alone; EJS then writes it as &#39;.
+function correctionLink(html) {
+  const match = String(html || '').match(/<a class="grave-note__report" href="([^"]*)" target="_blank" rel="noopener noreferrer"/);
+  if (!match) return null;
+  const raw = match[1];
+  let url = null;
+  try {
+    url = new URL(htmlUnescape(raw));
+  } catch (error) {
+    url = null;
+  }
+  return { raw: raw, url: url };
+}
+
+function hrefAmpersandsAreEntities(raw) {
+  return !/&(?!amp;|#39;|lt;|gt;|quot;)/.test(String(raw));
+}
+
+function formFieldIds(yaml) {
+  const ids = [];
+  const pattern = /^ {4}id: ([A-Za-z0-9_-]+)\s*$/gm;
+  let match = pattern.exec(yaml);
+  while (match) {
+    ids.push(match[1]);
+    match = pattern.exec(yaml);
+  }
+  return ids;
 }
 
 function sitemapLocs(xml) {
@@ -1286,6 +1326,59 @@ async function main() {
   });
   check('a friendly error page hides the exception and asks not to be indexed', friendly.result.statusCode === 500 && friendly.result.body.indexOf('Something went wrong') !== -1 && friendly.result.body.indexOf('noindex') !== -1 && friendly.result.body.indexOf(ADMIN_PASSWORD) === -1 && friendly.result.body.indexOf('exploded') === -1 && friendly.result.headers['Cache-Control'] === 'no-store');
   check('a friendly error log keeps the message and drops the secret', friendly.lines.join('\n').indexOf('Error rendering index.ejs') !== -1 && friendly.lines.join('\n').indexOf(ADMIN_PASSWORD) === -1 && friendly.lines.join('\n').indexOf('[redacted]') !== -1);
+
+  const correctionYaml = fs.readFileSync(path.resolve(__dirname, '../.github/ISSUE_TEMPLATE/record_correction.yml'), 'utf8');
+  same('the correction form ids the fields the grave page prefills', formFieldIds(correctionYaml), ['cemetery', 'record', 'record_id', 'name', 'wrong', 'correct', 'evidence']);
+  check('the correction form cemetery options are the three display names', correctionYaml.indexOf('Bamberg County Memory Gardens') !== -1 && correctionYaml.indexOf('Capernaum Cemetery') !== -1 && correctionYaml.indexOf('Honey Ford Cemetery') !== -1);
+
+  const correction = correctionLink(grave.body);
+  check('a found grave page offers Report a correction in a new tab', Boolean(correction && correction.url) && grave.body.indexOf('>Report a correction<span class="visually-hidden"> (opens in a new tab)</span></a>') !== -1);
+  same('the correction link opens the record correction form', correction && correction.url && (correction.url.origin + correction.url.pathname), 'https://github.com/dyarawilliams/MemoraFind/issues/new');
+  same('the correction link selects the record correction template', correction && correction.url && correction.url.searchParams.get('template'), 'record_correction.yml');
+  same('the correction title is the display name and record id', correction && correction.url && correction.url.searchParams.get('title'), 'Correction: Wilhelmina J Doe Abel, Jr (1000004)');
+  same('the correction cemetery matches a form option', correction && correction.url && correction.url.searchParams.get('cemetery'), 'Capernaum Cemetery');
+  same('the correction record link is the canonical grave URL', correction && correction.url && correction.url.searchParams.get('record'), 'https://memorafind.com/grave/1000004');
+  same('the correction record id is the memorial id', correction && correction.url && correction.url.searchParams.get('record_id'), '1000004');
+  same('the correction name matches the page heading', correction && correction.url && correction.url.searchParams.get('name'), 'Wilhelmina J Doe Abel, Jr');
+  check('the correction href percent-encodes the title, cemetery and grave URL', Boolean(correction) && correction.raw.indexOf('title=Correction%3A%20Wilhelmina%20J%20Doe%20Abel%2C%20Jr%20(1000004)') !== -1 && correction.raw.indexOf('cemetery=Capernaum%20Cemetery') !== -1 && correction.raw.indexOf('record=https%3A%2F%2Fmemorafind.com%2Fgrave%2F1000004') !== -1 && correction.raw.indexOf('record_id=1000004') !== -1 && correction.raw.indexOf('name=Wilhelmina%20J%20Doe%20Abel%2C%20Jr') !== -1 && correction.raw.indexOf('+') === -1 && hrefAmpersandsAreEntities(correction.raw));
+  check('the correction note says a free GitHub account is needed and links to Contact', grave.body.indexOf('free GitHub account') !== -1 && grave.body.indexOf('class="grave-note__contact" href="/contact"') !== -1);
+
+  const emptyCorrection = correctionLink(emptyGrave.body);
+  same('an unrecorded grave still prefills Honey Ford, the name and the record', emptyCorrection && emptyCorrection.url && [
+    emptyCorrection.url.searchParams.get('cemetery'),
+    emptyCorrection.url.searchParams.get('name'),
+    emptyCorrection.url.searchParams.get('title'),
+    emptyCorrection.url.searchParams.get('record'),
+    emptyCorrection.url.searchParams.get('record_id')
+  ], ['Honey Ford Cemetery', 'N Nobody', 'Correction: N Nobody (1000955)', 'https://memorafind.com/grave/1000955', '1000955']);
+
+  const oddCorrection = correctionLink(oddGrave.body);
+  same('a marked-up name is prefilled as text', oddCorrection && oddCorrection.url && [
+    oddCorrection.url.searchParams.get('name'),
+    oddCorrection.url.searchParams.get('title'),
+    oddCorrection.url.searchParams.get('cemetery'),
+    oddCorrection.url.searchParams.get('record'),
+    oddCorrection.url.searchParams.get('record_id')
+  ], ["Ann O'Brien A&B <test>", "Correction: Ann O'Brien A&B <test> (1000111)", 'Bamberg County Memory Gardens', 'https://memorafind.com/grave/1000111', '1000111']);
+  check('the correction href encodes an apostrophe, an ampersand and angle brackets', Boolean(oddCorrection) && oddCorrection.raw.indexOf("name=Ann%20O&#39;Brien%20A%26B%20%3Ctest%3E") !== -1 && oddCorrection.raw.indexOf('title=Correction%3A%20Ann%20O&#39;Brien%20A%26B%20%3Ctest%3E%20(1000111)') !== -1 && oddCorrection.raw.indexOf('<') === -1 && oddCorrection.raw.indexOf('>') === -1 && hrefAmpersandsAreEntities(oddCorrection.raw));
+
+  reset();
+  const malformedGrave = await renderGrave.handler({ path: '/grave/not-an-id' }, {});
+  const correctionAbsent = [
+    ['a non-id grave address', malformedGrave.body],
+    ['a missing record', missing.body],
+    ['an unknown cemetery', unknownCemetery.body],
+    ['a cemetery search', search.body],
+    ['the landing page', home.body],
+    ['the contact page', contact.body],
+    ['the administrator login', openGate.body],
+    ['the administrator update page', signedGate.body],
+    ['a friendly error', friendly.result.body]
+  ];
+  correctionAbsent.forEach(function (entry) {
+    check(entry[0] + ' does not offer Report a correction', entry[1].indexOf('grave-note__report') === -1 && entry[1].indexOf('record_correction.yml') === -1 && entry[1].indexOf('issues/new') === -1);
+  });
+  check('a non-id grave address is still a 404', malformedGrave.statusCode === 404);
 
   console.log(passed + ' checks passed');
   if (failures.length > 0) {
