@@ -175,7 +175,7 @@ A visitor can look a record up and read it, but changing anything requires the a
 
 ### Dependencies
 
-Node.js and npm. `npm install` installs what `package.json` lists. The handlers that read or save records use `@supabase/supabase-js`, and every HTML page is rendered with `ejs`. The same file also lists `express`, `express-session`, `dotenv` and `alert`, and no file in the repository requires them. Nothing is compiled and no global tooling is required.
+Node.js and npm. `npm install` installs what `package.json` lists. The handlers that read or save records use `@supabase/supabase-js`, and every HTML page is rendered with `ejs`. `netlify-cli` is a devDependency, so `npm start` runs the local Netlify dev server without a global install. Nothing is compiled and no global tooling is required.
 
 ### Getting the Source
 
@@ -193,7 +193,7 @@ git clone git@github.com:dyarawilliams/MemoraFind.git
 
 ### Environment Variables
 
-Set these in the Netlify site's environment settings. None of the values are recorded in this repository, and no file here loads a `.env`. `.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`, so a local copy of the values can sit in `.env` without being committed. Public search needs the two Supabase variables. Administrator sign-in also needs `ADMIN_EMAIL`, `ADMIN_SESSION_SECRET` (16 or more characters) and either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` — without them, login fails closed and no session cookie is issued. A save signs in to Supabase Auth as `ADMIN_EMAIL`. `SUPABASE_ADMIN_PASSWORD` is optional: the save uses it when it is set, and falls back to `ADMIN_PASSWORD` when it is unset or empty.
+Set these in the Netlify site's environment settings. For local development, copy `.env.example` to `.env` and replace the placeholders. None of the values are recorded in this repository. `.env`, `node_modules` and the local `.netlify` folder are the only entries in `.gitignore`, so `.env` is not committed. `npm start` runs `netlify dev`, and the Netlify CLI loads `.env` into the process the functions run in. A name already set in the shell is left as it is. Otherwise the `.env` value is the one the functions see, including when the linked site stores the same name. The handlers read `process.env`. A build on Netlify uses the site's environment settings and does not read `.env`. Public search needs the two Supabase variables. Administrator sign-in also needs `ADMIN_EMAIL`, `ADMIN_SESSION_SECRET` (16 or more characters) and either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` — without them, login fails closed and no session cookie is issued. A save signs in to Supabase Auth as `ADMIN_EMAIL`. `SUPABASE_ADMIN_PASSWORD` is optional: the save uses it when it is set, and falls back to `ADMIN_PASSWORD` when it is unset or empty.
 
 | Variable | Purpose |
 | --- | --- |
@@ -280,17 +280,20 @@ order by table_name, grantee, privilege_type;
 
 ### Running It Locally
 
-`npm install` installs the dependencies above. The functions read `SUPABASE_URL` and `SUPABASE_API_KEY` from the environment Netlify provides; without them, search, a grave page and the sitemap cannot read records.
+`npm install`, then copy `.env.example` to `.env` and fill in at least `SUPABASE_URL` and `SUPABASE_API_KEY`. `npm start` runs `netlify dev`. That command reads `netlify.toml`: it publishes `public/`, runs the functions in `netlify/functions/`, and applies the redirects, which is how Netlify serves the site. The CLI ignores a `start` script whose command contains `netlify dev` when it looks for an app server, so it serves `public/` as static files and does not launch `npm start` a second time. No `[dev]` block is required.
 
-There is no local server in this repository. `npm start` runs `node server.js`, and `package.json` names `app.js` as `main`. Neither file is in the repository. `npm test` prints an error and exits 1. It is not a test suite.
+The dev server listens on port 8888. It serves the site from the local `.env` without a Netlify login. `netlify login` and `netlify link` also pull the linked site's environment variables. A name set in `.env` is still the value the functions see, unless that name is already exported in the shell.
 
-What can be run here:
+`npm test` runs `node tools/verify-review-fixes.js`. That checks the handlers and templates against a stub database. No request leaves the process. The script sets the environment variables it needs, so it does not read `.env`.
 
-* `node tools/verify-review-fixes.js` — the handlers and templates against a stub database. No request leaves the process.
+`package.json` still names `app.js` as `main`. That file is not in the repository. `npm start` and `npm test` do not use it.
+
+Two other tools stay as direct Node commands:
+
 * `node tools/build-sitemap.js` — checks that the three CSVs still hold memorial IDs 1000001–1002428. It does not write a sitemap.
 * `node tools/build-404.js` — rewrites `public/404.html` from `not-found.ejs`. `node tools/build-404.js --check` exits 1 if that file is stale.
 
-A change to a page is checked on the Netlify deploy preview that Netlify builds for a branch or pull request. The site itself is served by Netlify.
+A change to a page is also checked on the Netlify deploy preview that Netlify builds for a branch or pull request. The live site is served by Netlify.
 
 ### Deploying
 
