@@ -996,6 +996,23 @@ legend {
     color: var(--burgundy);
 }
 
+/* On a search card the name is also the link to the person's page, so the
+   whole heading is tappable and not just the small record ID badge. It keeps
+   the heading's burgundy ink and only draws the gold underline on hover and
+   focus, so a list of results still reads as a list of headings. */
+.record__name-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.record__name-link:hover,
+.record__name-link:focus-visible {
+    text-decoration: underline;
+    text-decoration-color: var(--gold-deep);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.15em;
+}
+
 .record__surname {
     font-weight: 650;
 }
