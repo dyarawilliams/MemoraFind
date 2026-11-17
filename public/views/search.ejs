@@ -191,9 +191,10 @@
                             <path d="M10 1.8a8.2 8.2 0 1 0 0 16.4 8.2 8.2 0 0 0 0-16.4Zm0 3a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2Zm1.1 10.1H8.9v-1.1h.7V10h-.7V8.9h2.2v4.9h.7Z" fill="currentColor" />
                         </svg>
                         <p>
-                            <strong>Need a record corrected?</strong> Note the record ID shown on
-                            the card, then contact a library administrator &mdash; signing in lets
-                            you update that record. Records are read-only otherwise.
+                            <strong>Spotted a mistake?</strong> Open the person's page and use
+                            <strong>Report a correction</strong> there, or send it from the
+                            <a href="/contact">Contact page</a>. Every record here is public and
+                            read-only.
                         </p>
                     </div>
 
@@ -278,7 +279,11 @@
                                 <li>
                                     <article class="record">
                                         <div class="record__head">
-                                            <h3 class="record__name"><%
+                                            <% /* The name is the link to the person's own
+                                                  page as well as the record ID badge: on a
+                                                  phone the badge is a very small target and
+                                                  a heading that does nothing reads as broken. */ %>
+                                            <h3 class="record__name"><a class="record__name-link" href="/grave/<%= record.memorial_id %>"><%
                                                 if (givenNames) { %><span class="record__given"><%= givenNames %></span><% }
                                                 if (maidenName) {
                                                     if (givenNames) { %> <% }
@@ -292,7 +297,7 @@
                                                     if (givenNames || maidenName || surname) { %>, <% }
                                                     %><span class="record__given"><%= suffix %></span><%
                                                 }
-                                            %></h3>
+                                            %></a></h3>
                                             <ul class="record__badges">
                                                 <li>
                                                     <% /* The record ID is the address of this
