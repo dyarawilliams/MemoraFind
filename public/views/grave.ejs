@@ -25,11 +25,13 @@
      when the record is flagged as one, both exactly as the card does.
 
      The correction link at the foot of this page — and only this page — opens
-     the GitHub issue form record_correction.yml. The title, cemetery, canonical
-     grave URL, record ID and the same heading name are query parameters. Each
-     value goes through encodeURIComponent, and the href is printed escaped.
-     A missing record, an unreadable record and the administrator pages do not
-     include it. */
+     the GitHub issue form record_correction.yml. GitHub prefills only `title`
+     and `body`, so the name, cemetery, dates, record ID and canonical grave URL
+     are written into `body`; a per-field query parameter is dropped by an issue
+     form. A second link opens the same details as a prefilled email for people
+     with no GitHub account. Each value goes through encodeURIComponent, and the
+     hrefs are printed escaped. A missing record, an unreadable record and the
+     administrator pages do not include them. */
   var display = {};
   include('partials/record-display.ejs', { display: display });
 
@@ -118,32 +120,51 @@
       .replace(/\u2028/g, "\\u2028")
       .replace(/\u2029/g, "\\u2029");
 
-  /* These are the option labels on the cemetery dropdown in
-     .github/ISSUE_TEMPLATE/record_correction.yml. A value that is not one of
-     them is left off the link: GitHub only prefills a dropdown when the query
-     value matches an option exactly. */
-  var correctionCemeteries = [
-      "Bamberg County Memory Gardens",
-      "Capernaum Cemetery",
-      "Honey Ford Cemetery"
-  ];
   var correctionTitle = "Correction: " + (nameText || "record");
   if (memorialId) correctionTitle += " (" + memorialId + ")";
+
+  /* Everything this page already knows goes into the issue's `body`, not into
+     per-field query parameters. GitHub prefills `title` and `body`; the field
+     names (cemetery, record, record_id, name) are silently dropped by an issue
+     form, which is why the form used to arrive empty and the visitor retyped
+     the name, dates and record ID. `body` is prefilled, so the visitor only
+     says what is wrong and what it should say. */
+  var correctionFacts = [];
+  correctionFacts.push("**Record:** " + (nameText || "(no name recorded)") + (memorialId ? " (" + memorialId + ")" : ""));
+  if (cemeteryName) correctionFacts.push("**Cemetery:** " + cemeteryName);
+  correctionFacts.push("**Born:** " + (bornDate || "not recorded"));
+  correctionFacts.push("**Died:** " + (diedDate || "not recorded"));
+  if (/^\d+$/.test(memorialId)) {
+      correctionFacts.push("**Record page:** https://memorafind.com/grave/" + memorialId);
+  }
+
+  var correctionBody = correctionFacts.join("\n")
+      + "\n\n### What is wrong\n"
+      + "<!-- The detail that is incorrect: name, dates, cemetery, or a person who is not listed. -->\n"
+      + "\n### What it should say\n"
+      + "<!-- Leave a part out if it was never recorded. -->\n"
+      + "\n### Source or evidence\n"
+      + "<!-- A headstone, an obituary, a cemetery list, or a family source. -->\n";
+
   var correctionFields = [
       ["template", "record_correction.yml"],
-      ["title", correctionTitle]
+      ["title", correctionTitle],
+      ["body", correctionBody]
   ];
-  if (correctionCemeteries.indexOf(cemeteryName) !== -1) {
-      correctionFields.push(["cemetery", cemeteryName]);
-  }
-  if (/^\d+$/.test(memorialId)) {
-      correctionFields.push(["record", "https://memorafind.com/grave/" + memorialId]);
-      correctionFields.push(["record_id", memorialId]);
-  }
-  if (nameText) correctionFields.push(["name", nameText]);
   var correctionUrl = "https://github.com/dyarawilliams/MemoraFind/issues/new?" + correctionFields.map(function (field) {
       return encodeURIComponent(field[0]) + "=" + encodeURIComponent(field[1]);
   }).join("&");
+
+  /* The same details by email, for the many family researchers who have no
+     GitHub account. A mail client prefills subject and body, so this path
+     retypes nothing either. */
+  var correctionEmailBody = correctionFacts.map(function (line) {
+      return line.replace(/\*\*/g, "");
+  }).join("\n")
+      + "\n\nWhat is wrong:\n\nWhat it should say:\n\nSource or evidence:\n";
+  var correctionEmailUrl = "mailto:memorafind@gmail.com"
+      + "?subject=" + encodeURIComponent(correctionTitle)
+      + "&body=" + encodeURIComponent(correctionEmailBody);
 %>
 <%- include('partials/header.ejs', {
       pageTitle: pageTitle,
@@ -264,8 +285,11 @@
                             <a class="grave-note__report" href="<%= correctionUrl %>" target="_blank" rel="noopener noreferrer" aria-describedby="grave-correction-note">Report a correction<span class="visually-hidden"> (opens in a new tab)</span></a>
                         </p>
                         <p id="grave-correction-note">
-                            Reporting a correction opens a GitHub issue and needs a free GitHub account.
-                            You can also send a correction from the <a class="grave-note__contact" href="/contact">Contact page</a>.
+                            The correction carries this record's name, dates and ID, so you only describe
+                            what is wrong. Reporting it on GitHub needs a free GitHub account — or
+                            <a class="grave-note__email" href="<%= correctionEmailUrl %>">send the same details by email</a>,
+                            which needs no account. You can also write from the
+                            <a class="grave-note__contact" href="/contact">Contact page</a>.
                             This page only shows the record MemoraFind holds.
                         </p>
                     </div>

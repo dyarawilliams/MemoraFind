@@ -411,6 +411,21 @@ function hrefAmpersandsAreEntities(raw) {
   return !/&(?!amp;|#39;|lt;|gt;|quot;)/.test(String(raw));
 }
 
+// The same record details, offered as a prefilled email for visitors with no
+// GitHub account.
+function emailLink(html) {
+  const match = String(html || '').match(/<a class="grave-note__email" href="([^"]*)"/);
+  if (!match) return null;
+  const raw = match[1];
+  let url = null;
+  try {
+    url = new URL(htmlUnescape(raw));
+  } catch (error) {
+    url = null;
+  }
+  return { raw: raw, url: url };
+}
+
 function formFieldIds(yaml) {
   const ids = [];
   const pattern = /^ {4}id: ([A-Za-z0-9_-]+)\s*$/gm;
@@ -1336,31 +1351,32 @@ async function main() {
   same('the correction link opens the record correction form', correction && correction.url && (correction.url.origin + correction.url.pathname), 'https://github.com/dyarawilliams/MemoraFind/issues/new');
   same('the correction link selects the record correction template', correction && correction.url && correction.url.searchParams.get('template'), 'record_correction.yml');
   same('the correction title is the display name and record id', correction && correction.url && correction.url.searchParams.get('title'), 'Correction: Wilhelmina J Doe Abel, Jr (1000004)');
-  same('the correction cemetery matches a form option', correction && correction.url && correction.url.searchParams.get('cemetery'), 'Capernaum Cemetery');
-  same('the correction record link is the canonical grave URL', correction && correction.url && correction.url.searchParams.get('record'), 'https://memorafind.com/grave/1000004');
-  same('the correction record id is the memorial id', correction && correction.url && correction.url.searchParams.get('record_id'), '1000004');
-  same('the correction name matches the page heading', correction && correction.url && correction.url.searchParams.get('name'), 'Wilhelmina J Doe Abel, Jr');
-  check('the correction href percent-encodes the title, cemetery and grave URL', Boolean(correction) && correction.raw.indexOf('title=Correction%3A%20Wilhelmina%20J%20Doe%20Abel%2C%20Jr%20(1000004)') !== -1 && correction.raw.indexOf('cemetery=Capernaum%20Cemetery') !== -1 && correction.raw.indexOf('record=https%3A%2F%2Fmemorafind.com%2Fgrave%2F1000004') !== -1 && correction.raw.indexOf('record_id=1000004') !== -1 && correction.raw.indexOf('name=Wilhelmina%20J%20Doe%20Abel%2C%20Jr') !== -1 && correction.raw.indexOf('+') === -1 && hrefAmpersandsAreEntities(correction.raw));
+
+  // An issue form drops a per-field query parameter and prefills only title and
+  // body, so the record itself has to travel in body. Everything the page knows
+  // goes there, and the visitor only writes what is wrong.
+  const correctionBody = (correction && correction.url && correction.url.searchParams.get('body')) || '';
+  check('the correction body carries the name, cemetery and record id', correctionBody.indexOf('**Record:** Wilhelmina J Doe Abel, Jr (1000004)') !== -1 && correctionBody.indexOf('**Cemetery:** Capernaum Cemetery') !== -1);
+  check('the correction body carries both dates rather than a placeholder', /\*\*Born:\*\* \S/.test(correctionBody) && /\*\*Died:\*\* \S/.test(correctionBody) && correctionBody.indexOf('not recorded') === -1);
+  check('the correction body links the record page', correctionBody.indexOf('**Record page:** https://memorafind.com/grave/1000004') !== -1);
+  check('the correction body asks only for what is wrong, what it should say, and the evidence', correctionBody.indexOf('### What is wrong') !== -1 && correctionBody.indexOf('### What it should say') !== -1 && correctionBody.indexOf('### Source or evidence') !== -1);
+  check('the correction href percent-encodes the title and body, with no + and no raw ampersand', Boolean(correction) && correction.raw.indexOf('title=Correction%3A%20Wilhelmina%20J%20Doe%20Abel%2C%20Jr%20(1000004)') !== -1 && correction.raw.indexOf('body=') !== -1 && correction.raw.indexOf('+') === -1 && hrefAmpersandsAreEntities(correction.raw));
   check('the correction note says a free GitHub account is needed and links to Contact', grave.body.indexOf('free GitHub account') !== -1 && grave.body.indexOf('class="grave-note__contact" href="/contact"') !== -1);
 
+  const correctionEmail = emailLink(grave.body);
+  check('the same record details are offered as a prefilled email', Boolean(correctionEmail && correctionEmail.url) && correctionEmail.url.protocol === 'mailto:' && correctionEmail.url.pathname === 'memorafind@gmail.com');
+  same('the email subject is the same correction title', correctionEmail && correctionEmail.url && correctionEmail.url.searchParams.get('subject'), 'Correction: Wilhelmina J Doe Abel, Jr (1000004)');
+  const emailBody = (correctionEmail && correctionEmail.url && correctionEmail.url.searchParams.get('body')) || '';
+  check('the email body carries the name, cemetery, both dates and the record id', emailBody.indexOf('Record: Wilhelmina J Doe Abel, Jr (1000004)') !== -1 && emailBody.indexOf('Cemetery: Capernaum Cemetery') !== -1 && /\nBorn: \S/.test(emailBody) && /\nDied: \S/.test(emailBody) && emailBody.indexOf('https://memorafind.com/grave/1000004') !== -1);
+
   const emptyCorrection = correctionLink(emptyGrave.body);
-  same('an unrecorded grave still prefills Honey Ford, the name and the record', emptyCorrection && emptyCorrection.url && [
-    emptyCorrection.url.searchParams.get('cemetery'),
-    emptyCorrection.url.searchParams.get('name'),
-    emptyCorrection.url.searchParams.get('title'),
-    emptyCorrection.url.searchParams.get('record'),
-    emptyCorrection.url.searchParams.get('record_id')
-  ], ['Honey Ford Cemetery', 'N Nobody', 'Correction: N Nobody (1000955)', 'https://memorafind.com/grave/1000955', '1000955']);
+  const emptyCorrectionBody = (emptyCorrection && emptyCorrection.url && emptyCorrection.url.searchParams.get('body')) || '';
+  check('an unrecorded grave still carries Honey Ford, the name and the record', Boolean(emptyCorrection) && emptyCorrection.url.searchParams.get('title') === 'Correction: N Nobody (1000955)' && emptyCorrectionBody.indexOf('**Record:** N Nobody (1000955)') !== -1 && emptyCorrectionBody.indexOf('**Cemetery:** Honey Ford Cemetery') !== -1 && emptyCorrectionBody.indexOf('**Record page:** https://memorafind.com/grave/1000955') !== -1);
 
   const oddCorrection = correctionLink(oddGrave.body);
-  same('a marked-up name is prefilled as text', oddCorrection && oddCorrection.url && [
-    oddCorrection.url.searchParams.get('name'),
-    oddCorrection.url.searchParams.get('title'),
-    oddCorrection.url.searchParams.get('cemetery'),
-    oddCorrection.url.searchParams.get('record'),
-    oddCorrection.url.searchParams.get('record_id')
-  ], ["Ann O'Brien A&B <test>", "Correction: Ann O'Brien A&B <test> (1000111)", 'Bamberg County Memory Gardens', 'https://memorafind.com/grave/1000111', '1000111']);
-  check('the correction href encodes an apostrophe, an ampersand and angle brackets', Boolean(oddCorrection) && oddCorrection.raw.indexOf("name=Ann%20O&#39;Brien%20A%26B%20%3Ctest%3E") !== -1 && oddCorrection.raw.indexOf('title=Correction%3A%20Ann%20O&#39;Brien%20A%26B%20%3Ctest%3E%20(1000111)') !== -1 && oddCorrection.raw.indexOf('<') === -1 && oddCorrection.raw.indexOf('>') === -1 && hrefAmpersandsAreEntities(oddCorrection.raw));
+  const oddCorrectionBody = (oddCorrection && oddCorrection.url && oddCorrection.url.searchParams.get('body')) || '';
+  check('a marked-up name is carried as text', Boolean(oddCorrection) && oddCorrection.url.searchParams.get('title') === "Correction: Ann O'Brien A&B <test> (1000111)" && oddCorrectionBody.indexOf("**Record:** Ann O'Brien A&B <test> (1000111)") !== -1 && oddCorrectionBody.indexOf('**Cemetery:** Bamberg County Memory Gardens') !== -1);
+  check('the correction href encodes an apostrophe, an ampersand and angle brackets', Boolean(oddCorrection) && oddCorrection.raw.indexOf('title=Correction%3A%20Ann%20O&#39;Brien%20A%26B%20%3Ctest%3E%20(1000111)') !== -1 && oddCorrection.raw.indexOf('<') === -1 && oddCorrection.raw.indexOf('>') === -1 && hrefAmpersandsAreEntities(oddCorrection.raw));
 
   reset();
   const malformedGrave = await renderGrave.handler({ path: '/grave/not-an-id' }, {});
@@ -1376,9 +1392,15 @@ async function main() {
     ['a friendly error', friendly.result.body]
   ];
   correctionAbsent.forEach(function (entry) {
-    check(entry[0] + ' does not offer Report a correction', entry[1].indexOf('grave-note__report') === -1 && entry[1].indexOf('record_correction.yml') === -1 && entry[1].indexOf('issues/new') === -1);
+    check(entry[0] + ' does not offer Report a correction', entry[1].indexOf('grave-note__report') === -1 && entry[1].indexOf('grave-note__email') === -1 && entry[1].indexOf('record_correction.yml') === -1 && entry[1].indexOf('issues/new') === -1);
   });
   check('a non-id grave address is still a 404', malformedGrave.statusCode === 404);
+
+  // The dead end the audit found: every search page and two home-page spots told
+  // visitors to "sign in as a library administrator", a login no visitor can use.
+  check('the search page offers the real correction path instead of an administrator login', search.body.indexOf('library administrator') === -1 && search.body.indexOf('Spotted a mistake?') !== -1 && search.body.indexOf('<a href="/contact">Contact page</a>') !== -1);
+  check('the home page offers the real correction path in both places, with no administrator login', home.body.indexOf('library administrator') === -1 && home.body.split('<a href="/contact">Contact page</a>').length - 1 >= 2 && home.body.indexOf('Report a correction') !== -1);
+  check('the result card name is a link to the person\'s page', search.body.indexOf('<h3 class="record__name"><a class="record__name-link" href="/grave/1000004">') !== -1 && search.body.indexOf('</span></a></h3>') !== -1);
 
   console.log(passed + ' checks passed');
   if (failures.length > 0) {
